@@ -2,12 +2,13 @@
 //  Use, modification and distribution are subject to the
 //  Boost Software License, Version 1.0. (See accompanying file
 //  LICENSE or copy at http://www.boost.org/LICENSE_1_0.txt)
-//
-//  See ISO/IEC TR 24733 
 
-#ifndef BOOST_DECIMAL_HPP
-#define BOOST_DECIMAL_HPP
+#include "../include/boost/decimal/decimal32.hpp"
 
-#include <boost/decimal/decimal32.hpp>
+int main (void)
+{
+    boost::decimal::decimal32_t dummy(9999999, 2);
+    dummy.print();
 
-#endif // BOOST_DECIMAL_HPP
+    return 0;
+}

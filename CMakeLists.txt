@@ -30,6 +30,7 @@ else()
   target_link_libraries(boost_decimal
     INTERFACE
       Boost::config
+      Boost::endian
   )
 
 endif()
@@ -38,6 +39,7 @@ endif()
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
 
   include(CTest)
+  enable_testing()
   add_subdirectory(test)
 
 endif()
