@@ -3,8 +3,9 @@
 //  Boost Software License, Version 1.0. (See accompanying file
 //  LICENSE or copy at http://www.boost.org/LICENSE_1_0.txt)
 //
-//  See IEEE 754-2019
-//  Redueced exponent range for close interop with float
+//  See https://www.open-std.org/JTC1/SC22/WG21/docs/papers/2009/n2849.pdf
+//
+//  Similar to IEEE 754-2019 but with reduced exponent range for close interop with float
 //  and less complex implementation
 
 #ifndef BOOST_DECIMAL_DECIMAL32_HPP
@@ -38,8 +39,8 @@ private:
     struct bit_layout_
     {
         std::uint32_t mantissa : 24;
-        std::int32_t expon : 7;
-        std::uint32_t sign : 1;
+        std::int32_t  expon    : 7;
+        std::uint32_t sign     : 1;
     };
 
     bit_layout_ data_;
@@ -50,8 +51,13 @@ public:
     /// 3.2.5  Initialization from coefficient and exponent.
     constexpr decimal32(std::integral auto coeff, int expon);
 
-    void print() const { std::cout << "Man: " << data_.mantissa << "\nExpon: " << data_.expon << std::endl; }
+    /// Getters to allow access to the bit layout
+    [[nodiscard]] constexpr auto mantissa() const noexcept { return data_.mantissa; }
+    [[nodiscard]] constexpr auto expon() const noexcept { return data_.expon; }
+    [[nodiscard]] constexpr auto sign() const noexcept { return data_.sign; }
 
+    // TODO: Extra debugging functions. Can be removed for release
+    void print() const { std::cout << "Man: " << data_.mantissa << "\nExpon: " << data_.expon << std::endl; }
     constexpr unsigned size() const { return sizeof(data_); }
 };
 
