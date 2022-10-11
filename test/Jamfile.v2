@@ -10,6 +10,7 @@ project
 test-suite properties :
     [ run size_test.cpp ]
     [ run type_traits_test.cpp ]
+    [ run constructor_test.cpp ]
 ;
 
 

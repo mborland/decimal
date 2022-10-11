@@ -24,6 +24,7 @@
 #define BOOST_DECIMAL32_EMAX            64
 #define BOOST_DECIMAL32_EMIN            -63
 #define BOOST_DECIMAL32_MAN_MAX         9999999
+#define BOOST_DECIMAL32_MAN_MIN         1000000
 
 // Use the extra range of the mantissa
 #define BOOST_DECIMAL32_INF             0B111111111111111111111111
@@ -45,11 +46,18 @@ private:
 
     bit_layout_ data_;
 
+    constexpr void normalize() noexcept;
+
 public:
     decimal32() = default;
 
     /// 3.2.5  Initialization from coefficient and exponent.
     constexpr decimal32(std::integral auto coeff, int expon);
+
+    /// 3.2.6  Conversion to generic floating-point type
+    [[nodiscard]] constexpr float to_float() const noexcept;
+    //[[nodiscard]] constexpr double to_double() const noexcept;
+    //[[nodiscard]] constexpr long double to_long_double() const noexcept;
 
     /// Getters to allow access to the bit layout
     [[nodiscard]] constexpr auto mantissa() const noexcept { return data_.mantissa; }
@@ -60,6 +68,14 @@ public:
     void print() const { std::cout << "Man: " << data_.mantissa << "\nExpon: " << data_.expon << std::endl; }
     constexpr unsigned size() const { return sizeof(data_); }
 };
+
+constexpr void decimal32::normalize() noexcept
+{
+    while (this->mantissa() < BOOST_DECIMAL32_MAN_MIN)
+    {
+        this->data_.mantissa *= 10;
+    }
+}
 
 constexpr decimal32::decimal32(std::integral auto coeff, int expon)
 {
@@ -90,6 +106,13 @@ constexpr decimal32::decimal32(std::integral auto coeff, int expon)
         this->data_.mantissa = coeff;
         this->data_.expon = expon;
     }
+
+    this->normalize();
+}
+
+[[nodiscard]] constexpr float decimal32::to_float() const noexcept
+{
+    return static_cast<float>(this->mantissa()) * std::pow(10.F, this->expon() - BOOST_DECIMAL32_PRECISION);
 }
 
 /// Type alias to match STL

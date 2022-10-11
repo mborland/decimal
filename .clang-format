@@ -2,17 +2,16 @@ Language: Cpp
 
 UseTab: Never
 IndentWidth: 4
-BreakBeforeBraces: Allman
 IndentCaseLabels: false
 ColumnLimit: 0
-AlignConsecutiveAssignments: true
-AlignConsecutiveDeclarations: true
+AlignConsecutiveAssignments: Consecutive
+AlignConsecutiveDeclarations: Consecutive
 AlignEscapedNewlines: Left
 AlignOperands: true
 AlignTrailingComments: true
 FixNamespaceComments: true
 NamespaceIndentation: None
-Standard: Cpp20
+Standard: c++20
 CompactNamespaces: true
 BreakBeforeBraces: Custom
 BraceWrapping:
@@ -20,13 +19,11 @@ BraceWrapping:
   AfterStruct: true
   SplitEmptyFunction: false
   AfterClass: true
-  AfterControlStatement: true
   AfterFunction: true
   AfterNamespace: false
   AfterUnion: true
   BeforeCatch: true
   BeforeElse: true
-  SplitEmptyFunction: false
   SplitEmptyRecord: false
 PointerAlignment: Left
-SortIncludes: false
+SortIncludes: Never
