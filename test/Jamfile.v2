@@ -9,7 +9,7 @@ project
 
 test-suite properties :
     [ run size_test.cpp ]
-    [ run type_traits.cpp ]
+    [ run type_traits_test.cpp ]
 ;
 
 

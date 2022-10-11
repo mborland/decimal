@@ -31,6 +31,7 @@ else()
     INTERFACE
       Boost::config
       Boost::endian
+      Boost::type_traits
   )
 
 endif()

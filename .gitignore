@@ -34,3 +34,5 @@
 # User Configurable
 build/
 .vscode/
+*.txt
+*.log

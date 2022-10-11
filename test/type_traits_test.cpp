@@ -8,6 +8,6 @@
 int main(void)
 {
     // Decimal32
-    static_assert(std::is_decimal_floating_point_v<boost::decimal::decimal32_t>);
-    static_assert(std::is_arithmetic_v<boost::decimal::decimal32_t>);
+    static_assert(boost::is_decimal_floating_point_v<boost::decimal::decimal32_t>);
+    static_assert(boost::is_arithmetic<boost::decimal::decimal32_t>::value);
 }
