@@ -21,7 +21,7 @@
 #define BOOST_DECIMAL32_BITS            32
 #define BOOST_DECIMAL32_BYTES           4
 #define BOOST_DECIMAL32_PRECISION       7
-#define BOOST_DECIMAL32_EMAX            64
+#define BOOST_DECIMAL32_EMAX            63
 #define BOOST_DECIMAL32_EMIN            -63
 #define BOOST_DECIMAL32_MAN_MAX         9999999
 #define BOOST_DECIMAL32_MAN_MIN         1000000
