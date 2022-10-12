@@ -17,6 +17,8 @@
 #include <iostream>
 #include <type_traits>
 #include <concepts>
+#include <stdexcept>
+#include <limits>
 
 #define BOOST_DECIMAL32_BITS            32
 #define BOOST_DECIMAL32_BYTES           4
@@ -47,6 +49,9 @@ private:
     bit_layout_ data_;
 
     constexpr void normalize() noexcept;
+    
+    template <typename T>
+    [[maybe_unused]] constexpr T to_type() const;
 
 public:
     decimal32() = default;
@@ -55,9 +60,9 @@ public:
     constexpr decimal32(std::integral auto coeff, int expon);
 
     /// 3.2.6  Conversion to generic floating-point type
-    [[nodiscard]] constexpr float to_float() const noexcept;
-    //[[nodiscard]] constexpr double to_double() const noexcept;
-    //[[nodiscard]] constexpr long double to_long_double() const noexcept;
+    [[maybe_unused]] constexpr auto to_float() const;
+    [[maybe_unused]] constexpr auto to_double() const;
+    [[maybe_unused]] constexpr auto to_long_double() const;
 
     /// Getters to allow access to the bit layout
     [[nodiscard]] constexpr auto mantissa() const noexcept { return data_.mantissa; }
@@ -110,9 +115,37 @@ constexpr decimal32::decimal32(std::integral auto coeff, int expon)
     this->normalize();
 }
 
-[[nodiscard]] constexpr float decimal32::to_float() const noexcept
+template <typename T>
+[[maybe_unused]] constexpr T decimal32::to_type() const
 {
-    return static_cast<float>(this->mantissa()) * std::pow(10.F, this->expon() - BOOST_DECIMAL32_PRECISION);
+    T temp {static_cast<T>(this->mantissa() * std::pow(static_cast<T>(10.), this->expon() - BOOST_DECIMAL32_PRECISION + 1))};
+
+    if (temp > (std::numeric_limits<T>::max)())
+    {
+        throw std::overflow_error("Decimal type exceeds the size of the target floating point type");
+    }
+
+    if (this->sign())
+    {
+        temp *= -1;
+    }
+
+    return temp;
+}
+
+[[maybe_unused]] constexpr auto decimal32::to_float() const
+{
+    return this->to_type<float>();
+}
+
+[[maybe_unused]] constexpr auto decimal32::to_double() const
+{
+    return this->to_type<double>();
+}
+
+[[maybe_unused]] constexpr auto decimal32::to_long_double() const
+{
+    return this->to_type<long double>();
 }
 
 /// Type alias to match STL
