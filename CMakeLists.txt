@@ -21,9 +21,9 @@ cmake_dependent_option(BOOST_DECIMAL_STANDALONE "Use Boost.Decimal in standalone
 
 message(STATUS "Boost.Decimal: standalone mode ${BOOST_DECIMAL_STANDALONE}")
 
-if(BOOST_MATH_STANDALONE)
+if(BOOST_DECIMAL_STANDALONE)
 
-  target_compile_definitions(boost_decimal INTERFACE BOOST_MATH_STANDALONE=1)
+  target_compile_definitions(boost_decimal INTERFACE BOOST_DECIMAL_STANDALONE=1)
 
 else()
 
@@ -32,6 +32,7 @@ else()
       Boost::config
       Boost::endian
       Boost::type_traits
+      Boost::math
   )
 
 endif()

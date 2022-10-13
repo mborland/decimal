@@ -19,6 +19,7 @@
 #include <concepts>
 #include <stdexcept>
 #include <limits>
+#include "tools/config.hpp"
 
 #define BOOST_DECIMAL32_BITS            32
 #define BOOST_DECIMAL32_BYTES           4
@@ -50,8 +51,11 @@ private:
 
     constexpr void normalize() noexcept;
     
-    template <typename T>
-    [[maybe_unused]] constexpr T to_type() const;
+    template <std::floating_point T>
+    [[nodiscard]] constexpr T to_floating_point_type() const;
+
+    template <std::integral T>
+    [[nodiscard]] constexpr T to_integral_type() const;
 
 public:
     decimal32() = default;
@@ -60,9 +64,22 @@ public:
     constexpr decimal32(std::integral auto coeff, int expon);
 
     /// 3.2.6  Conversion to generic floating-point type
-    [[maybe_unused]] constexpr auto to_float() const;
-    [[maybe_unused]] constexpr auto to_double() const;
-    [[maybe_unused]] constexpr auto to_long_double() const;
+    [[nodiscard]] constexpr auto to_float() const;
+    [[nodiscard]] constexpr auto to_double() const;
+    [[nodiscard]] constexpr auto to_long_double() const;
+
+    /// Non-conforming conversion to integral types
+    [[nodiscard]] constexpr auto to_int() const;
+    [[nodiscard]] constexpr auto to_unsigned_int() const;
+    [[nodiscard]] constexpr auto to_long() const;
+    [[nodiscard]] constexpr auto to_unsigned_long() const;
+    [[nodiscard]] constexpr auto to_long_long() const;
+    [[nodiscard]] constexpr auto to_unsigned_long_long() const;
+
+    /// Catch-all templated type
+    template <typename T>
+        requires std::is_floating_point_v<T> || std::is_integral_v<T>
+    [[nodiscard]] constexpr T to() const;
 
     /// Getters to allow access to the bit layout
     [[nodiscard]] constexpr auto mantissa() const noexcept { return data_.mantissa; }
@@ -115,14 +132,18 @@ constexpr decimal32::decimal32(std::integral auto coeff, int expon)
     this->normalize();
 }
 
-template <typename T>
-[[maybe_unused]] constexpr T decimal32::to_type() const
+template <std::floating_point T>
+[[nodiscard]] constexpr T decimal32::to_floating_point_type() const
 {
     T temp {static_cast<T>(this->mantissa() * std::pow(static_cast<T>(10.), this->expon() - BOOST_DECIMAL32_PRECISION + 1))};
 
-    if (temp > (std::numeric_limits<T>::max)())
+    // decimal32 can only be larger than floats
+    if constexpr (std::is_same_v<T, float>)
     {
-        throw std::overflow_error("Decimal type exceeds the size of the target floating point type");
+        if (temp == HUGE_VALF)
+        {
+            throw std::overflow_error("Decimal type exceeds the size of the target floating point type");
+        }
     }
 
     if (this->sign())
@@ -133,19 +154,76 @@ template <typename T>
     return temp;
 }
 
-[[maybe_unused]] constexpr auto decimal32::to_float() const
+[[nodiscard]] constexpr auto decimal32::to_float() const
 {
-    return this->to_type<float>();
+    return this->to_floating_point_type<float>();
 }
 
-[[maybe_unused]] constexpr auto decimal32::to_double() const
+[[nodiscard]] constexpr auto decimal32::to_double() const
 {
-    return this->to_type<double>();
+    return this->to_floating_point_type<double>();
 }
 
-[[maybe_unused]] constexpr auto decimal32::to_long_double() const
+[[nodiscard]] constexpr auto decimal32::to_long_double() const
 {
-    return this->to_type<long double>();
+    return this->to_floating_point_type<long double>();
+}
+
+template <std::integral T>
+[[nodiscard]] constexpr T decimal32::to_integral_type() const
+{
+    auto temp {this->to_floating_point_type<double>()};
+
+    if (temp > (std::numeric_limits<T>::max)())
+    {
+        throw std::overflow_error("Decimal type exceeds the size of the target integer type");
+    }
+
+    return static_cast<T>(temp);
+}
+
+[[nodiscard]] constexpr auto decimal32::to_int() const
+{
+    return this->to_integral_type<int>();
+}
+
+[[nodiscard]] constexpr auto decimal32::to_unsigned_int() const
+{
+    return this->to_integral_type<unsigned>();
+}
+
+[[nodiscard]] constexpr auto decimal32::to_long() const
+{
+    return this->to_integral_type<long>();
+}
+
+[[nodiscard]] constexpr auto decimal32::to_unsigned_long() const
+{
+    return this->to_integral_type<unsigned long>();
+}
+
+[[nodiscard]] constexpr auto decimal32::to_long_long() const
+{
+    return this->to_integral_type<long long>();
+}
+
+[[nodiscard]] constexpr auto decimal32::to_unsigned_long_long() const
+{
+    return this->to_integral_type<unsigned long long>();
+}
+
+template <typename T>
+    requires std::is_floating_point_v<T> || std::is_integral_v<T>
+[[nodiscard]] constexpr T decimal32::to() const
+{
+    if constexpr (std::is_floating_point_v<T>)
+    {
+        return this->to_floating_point_type<T>();
+    }
+    else
+    {
+        return this->to_integral_type<T>();
+    }
 }
 
 /// Type alias to match STL
