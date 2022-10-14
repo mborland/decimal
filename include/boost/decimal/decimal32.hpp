@@ -19,6 +19,7 @@
 #include <concepts>
 #include <stdexcept>
 #include <limits>
+#include <string>
 #include "tools/config.hpp"
 
 #define BOOST_DECIMAL32_BITS            32
@@ -75,6 +76,9 @@ public:
     [[nodiscard]] constexpr auto to_unsigned_long() const;
     [[nodiscard]] constexpr auto to_long_long() const;
     [[nodiscard]] constexpr auto to_unsigned_long_long() const;
+
+    /// Non-conforming conversion to string
+    [[nodiscard]] inline auto to_string() const;
 
     /// Catch-all templated type
     template <typename T>
@@ -210,6 +214,23 @@ template <std::integral T>
 [[nodiscard]] constexpr auto decimal32::to_unsigned_long_long() const
 {
     return this->to_integral_type<unsigned long long>();
+}
+
+[[nodiscard]] auto decimal32::to_string() const
+{
+    std::string result {};
+
+    result += std::to_string(this->mantissa());
+    result.insert(1, ".");
+    result += "e";
+    result += std::to_string(this->expon());
+
+    if (this->sign())
+    {
+        result.insert(0, "-");
+    }
+
+    return result;
 }
 
 template <typename T>

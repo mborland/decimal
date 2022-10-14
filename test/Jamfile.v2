@@ -30,4 +30,5 @@ test-suite properties :
     [ run constructor_test.cpp ]
     [ run to_floating_point_test.cpp ]
     [ run to_integral_test.cpp ]
+    [ run to_string_test.cpp ]
 ;
