@@ -6,6 +6,6 @@
 #ifndef BOOST_DECIMAL_TOOLS_CONFIG_HPP
 #define BOOST_DECIMAL_TOOLS_CONFIG_HPP
 
-#include <boost/decimal/tools/is_standalone.hpp>
+#include "is_standalone.hpp"
 
 #endif // BOOST_DECIMAL_TOOLS_CONFIG_HPP

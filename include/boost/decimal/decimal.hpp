@@ -10,5 +10,7 @@
 
 #include "decimal32.hpp"
 #include "detail/type_traits.hpp"
+#include "detail/concepts.hpp"
+#include "detail/math.hpp"
 
 #endif // BOOST_DECIMAL_HPP
