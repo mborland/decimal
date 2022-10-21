@@ -27,8 +27,10 @@
 #define BOOST_DECIMAL32_PRECISION       7
 #define BOOST_DECIMAL32_EMAX            63
 #define BOOST_DECIMAL32_EMIN            -63
+#define BOOST_DECIMAL32_E_BITS          7
 #define BOOST_DECIMAL32_MAN_MAX         9999999
 #define BOOST_DECIMAL32_MAN_MIN         1000000
+#define BOOST_DECIMAL32_MAN_BITS        24
 
 // Use the extra range of the mantissa
 #define BOOST_DECIMAL32_INF             0B111111111111111111111111
@@ -43,8 +45,8 @@ class decimal32 final
 private:
     struct bit_layout_
     {
-        std::uint32_t mantissa : 24;
-        std::int32_t  expon    : 7;
+        std::uint32_t mantissa : BOOST_DECIMAL32_MAN_BITS;
+        std::int32_t  expon    : BOOST_DECIMAL32_E_BITS;
         std::uint32_t sign     : 1;
     };
 
@@ -69,6 +71,9 @@ public:
 
     /// 3.2.5  Initialization from coefficient and exponent.
     constexpr decimal32(std::integral auto coeff, int expon);
+
+    /// Non-standard construct from sign, mantissa, exponent
+    constexpr decimal32(bool sign, std::integral auto mantissa, std::integral auto exponent) noexcept;
 
     /// 3.2.6  Conversion to generic floating-point type
     [[nodiscard]] constexpr auto to_float() const;
@@ -150,6 +155,13 @@ constexpr decimal32::decimal32(std::integral auto coeff, int expon)
     }
 
     this->normalize();
+}
+
+constexpr decimal32::decimal32(bool sign, std::integral auto mantissa, std::integral auto exponent) noexcept
+{
+    this->data_.sign = sign;
+    this->data_.mantissa = mantissa;
+    this->data_.expon = exponent;
 }
 
 template <std::floating_point T>
@@ -295,5 +307,58 @@ template <typename T>
 using decimal32_t = decimal32;
 
 } // Namespace boost::decimal
+
+// Specializaton of std::numeric_limits
+namespace std {
+
+template <>
+class numeric_limits<boost::decimal::decimal32>
+{
+public:
+    // Member constants
+    static constexpr bool is_specialized {true};
+    static constexpr bool is_signed {true};
+    static constexpr bool is_integer {false};
+    static constexpr bool is_exact {false};
+
+    static constexpr bool has_infinity {true};
+    static constexpr bool has_quiet_NaN {true};
+    static constexpr bool has_signaling_NaN {true};
+    static constexpr auto has_denorm {std::denorm_present};
+    static constexpr bool has_denorm_loss {true};
+
+    static constexpr bool round_style {std::round_to_nearest};
+
+    static constexpr bool is_iec559 {false};
+    static constexpr bool is_bounded {true};
+    static constexpr bool is_modulo {false};
+
+    static constexpr int digits {BOOST_DECIMAL32_MAN_BITS};
+    static constexpr int digits_10 {BOOST_DECIMAL32_PRECISION};
+    static constexpr int max_digits_10 {BOOST_DECIMAL32_PRECISION};
+    
+    static constexpr int radix {10};
+
+    static constexpr int min_exponent {BOOST_DECIMAL32_EMIN};
+    static constexpr int min_exponent_10 {BOOST_DECIMAL32_EMIN};
+    static constexpr int max_exponent {BOOST_DECIMAL32_EMAX};
+    static constexpr int max_exponent_10 {BOOST_DECIMAL32_EMAX};
+    
+    static constexpr bool traps {false};
+    static constexpr bool tinyness_before {false};
+
+    // Member functions
+    static constexpr boost::decimal::decimal32 min() noexcept {return boost::decimal::decimal32(false, BOOST_DECIMAL32_MAN_MIN, BOOST_DECIMAL32_EMIN);}
+    static constexpr boost::decimal::decimal32 lowest() noexcept {return boost::decimal::decimal32(true, BOOST_DECIMAL32_MAN_MAX, BOOST_DECIMAL32_EMAX);}
+    static constexpr boost::decimal::decimal32 max() noexcept {return boost::decimal::decimal32(false, BOOST_DECIMAL32_MAN_MAX, BOOST_DECIMAL32_EMAX);}
+    static constexpr auto                      epsilon() noexcept {return 0.0000001;}
+    static constexpr auto                      round_error() noexcept {return 0.0000005;}
+    static constexpr boost::decimal::decimal32 infinity() noexcept {return boost::decimal::decimal32(false, BOOST_DECIMAL32_INF, BOOST_DECIMAL32_EMAX);}
+    static constexpr boost::decimal::decimal32 quiet_NaN() noexcept {return boost::decimal::decimal32(true, BOOST_DECIMAL32_QUIET_NAN, BOOST_DECIMAL32_EMAX);}
+    static constexpr boost::decimal::decimal32 signaling_NaN() noexcept {return boost::decimal::decimal32(true, BOOST_DECIMAL32_SIGNALING_NAN, BOOST_DECIMAL32_EMAX);}
+    static constexpr boost::decimal::decimal32 denorm_min() noexcept {return min();}
+};
+
+} // Namespace std
 
 #endif // BOOST_DECIMAL_DECIMAL32_HPP
