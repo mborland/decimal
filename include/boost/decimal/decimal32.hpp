@@ -108,7 +108,7 @@ public:
 
     /// Getters to allow access to the bit layout
     [[nodiscard]] constexpr auto mantissa() const noexcept { return data_.mantissa; }
-    [[nodiscard]] constexpr auto expon() const noexcept { return data_.expon; }
+    [[nodiscard]] constexpr auto exponent() const noexcept { return data_.expon; }
     [[nodiscard]] constexpr auto sign() const noexcept { return data_.sign; }
 
     // TODO: Extra debugging functions. Can be removed for release
@@ -167,7 +167,7 @@ constexpr decimal32::decimal32(bool sign, std::integral auto mantissa, std::inte
 template <std::floating_point T>
 [[nodiscard]] constexpr T decimal32::to_floating_point_type() const
 {
-    T temp {static_cast<T>(this->mantissa() * std::pow(static_cast<T>(10.), this->expon() - BOOST_DECIMAL32_PRECISION + 1))};
+    T temp {static_cast<T>(this->mantissa() * std::pow(static_cast<T>(10.), this->exponent() - BOOST_DECIMAL32_PRECISION + 1))};
 
     // decimal32 can only be larger than floats
     if constexpr (std::is_same_v<T, float>)
@@ -251,7 +251,7 @@ template <std::integral T>
     result += std::to_string(this->mantissa());
     result.insert(1, ".");
     result += "e";
-    result += std::to_string(this->expon());
+    result += std::to_string(this->exponent());
 
     if (this->sign())
     {
@@ -289,7 +289,7 @@ template <typename T>
 [[nodiscard]] constexpr bool decimal32::operator==(decimal32 rhs) noexcept
 {
     if (this->sign() == rhs.sign() &&
-        this->expon() == rhs.expon() &&
+        this->exponent() == rhs.exponent() &&
         this->mantissa() == rhs.mantissa())
     {
         return true;

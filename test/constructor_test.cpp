@@ -12,6 +12,6 @@ BOOST_AUTO_TEST_CASE( int_constructor )
 {
     boost::decimal::decimal32_t ten(10, 1);
     BOOST_TEST(ten.mantissa() == BOOST_DECIMAL32_MAN_MIN);
-    BOOST_TEST(ten.expon() == 1);
+    BOOST_TEST(ten.exponent() == 1);
     BOOST_TEST(!ten.sign());
 }
