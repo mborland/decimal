@@ -31,4 +31,5 @@ test-suite properties :
     [ run to_floating_point_test.cpp ]
     [ run to_integral_test.cpp ]
     [ run to_string_test.cpp ]
+    [ run unary_arithmetic_test.cpp ]
 ;

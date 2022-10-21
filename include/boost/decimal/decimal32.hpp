@@ -59,7 +59,13 @@ private:
     [[nodiscard]] constexpr T to_integral_type() const;
 
 public:
+    // Rule of 5
     decimal32() = default;
+    decimal32(const decimal32&) = default;
+    decimal32(decimal32&&) noexcept = default;
+    decimal32& operator=(const decimal32&) = default;
+    decimal32& operator=(decimal32&&) = default;
+    ~decimal32() = default;
 
     /// 3.2.5  Initialization from coefficient and exponent.
     constexpr decimal32(std::integral auto coeff, int expon);
@@ -77,13 +83,23 @@ public:
     [[nodiscard]] constexpr auto to_long_long() const;
     [[nodiscard]] constexpr auto to_unsigned_long_long() const;
 
-    /// Non-conforming conversion to string
-    [[nodiscard]] inline auto to_string() const;
-
     /// Catch-all templated type
     template <typename T>
         requires std::is_floating_point_v<T> || std::is_integral_v<T>
     [[nodiscard]] constexpr T to() const;
+
+    /// Non-conforming conversion to string
+    [[nodiscard]] inline auto to_string() const;
+
+    // 3.2.7 Unary arithmetic operators
+    [[nodiscard]] constexpr decimal32 operator+() noexcept;
+    [[nodiscard]] constexpr decimal32 operator-() noexcept;
+
+    // 3.2.8 Binary arithmetic operators
+
+    // 3.2.9 Comparison operators
+    [[nodiscard]] constexpr bool operator==(decimal32 rhs) noexcept;
+    [[nodiscard]] constexpr bool operator!=(decimal32 rhs) noexcept;
 
     /// Getters to allow access to the bit layout
     [[nodiscard]] constexpr auto mantissa() const noexcept { return data_.mantissa; }
@@ -245,6 +261,34 @@ template <typename T>
     {
         return this->to_integral_type<T>();
     }
+}
+
+[[nodiscard]] constexpr decimal32 decimal32::operator+() noexcept
+{
+    return *this;
+}
+
+[[nodiscard]] constexpr decimal32 decimal32::operator-() noexcept
+{
+    this->data_.sign = !this->data_.sign;
+    return *this;
+}
+
+[[nodiscard]] constexpr bool decimal32::operator==(decimal32 rhs) noexcept
+{
+    if (this->sign() == rhs.sign() &&
+        this->expon() == rhs.expon() &&
+        this->mantissa() == rhs.mantissa())
+    {
+        return true;
+    }
+
+    return false;
+}
+
+[[nodiscard]] constexpr bool decimal32::operator!=(decimal32 rhs) noexcept
+{
+    return !(*this == rhs);
 }
 
 /// Type alias to match STL
