@@ -104,7 +104,14 @@ public:
 
     // 3.2.9 Comparison operators
     [[nodiscard]] constexpr bool operator==(decimal32 rhs) noexcept;
+
+    template <std::integral T>
+    [[nodiscard]] constexpr bool operator==(T rhs) noexcept;
+
     [[nodiscard]] constexpr bool operator!=(decimal32 rhs) noexcept;
+
+    template <std::integral T>
+    [[nodiscard]] constexpr bool operator!=(T rhs) noexcept;
 
     /// Getters to allow access to the bit layout
     [[nodiscard]] constexpr auto mantissa() const noexcept { return data_.mantissa; }
@@ -298,7 +305,24 @@ template <typename T>
     return false;
 }
 
+template <std::integral T>
+[[nodiscard]] constexpr bool decimal32::operator==(T rhs) noexcept
+{
+    if (this->to<T>() == rhs)
+    {
+        return true;
+    }
+
+    return false;
+}
+
 [[nodiscard]] constexpr bool decimal32::operator!=(decimal32 rhs) noexcept
+{
+    return !(*this == rhs);
+}
+
+template <std::integral T>
+[[nodiscard]] constexpr bool decimal32::operator!=(T rhs) noexcept
 {
     return !(*this == rhs);
 }
