@@ -80,7 +80,7 @@ public:
     [[nodiscard]] constexpr auto to_double() const;
     [[nodiscard]] constexpr auto to_long_double() const;
 
-    /// Non-conforming conversion to integral types
+    // 3.2.2.5  Conversion to integral type.
     [[nodiscard]] constexpr auto to_int() const;
     [[nodiscard]] constexpr auto to_unsigned_int() const;
     [[nodiscard]] constexpr auto to_long() const;
@@ -112,6 +112,8 @@ public:
 
     template <std::integral T>
     [[nodiscard]] constexpr bool operator!=(T rhs) noexcept;
+
+    [[nodiscard]] constexpr decimal32 operator!() noexcept;
 
     /// Getters to allow access to the bit layout
     [[nodiscard]] constexpr auto mantissa() const noexcept { return data_.mantissa; }
@@ -325,6 +327,14 @@ template <std::integral T>
 [[nodiscard]] constexpr bool decimal32::operator!=(T rhs) noexcept
 {
     return !(*this == rhs);
+}
+
+[[nodiscard]] constexpr decimal32 decimal32::operator!() noexcept
+{
+    auto temp = *this;
+    temp.data_.sign = !temp.data_.sign;
+
+    return temp;
 }
 
 /// Type alias to match STL
