@@ -101,6 +101,8 @@ public:
     [[nodiscard]] constexpr decimal32 operator-() noexcept;
 
     // 3.2.8 Binary arithmetic operators
+    [[nodiscard]] constexpr decimal32 operator*(decimal32 rhs) const noexcept;
+    constexpr void operator*=(decimal32 rhs) noexcept;
 
     // 3.2.9 Comparison operators
     [[nodiscard]] constexpr bool operator==(decimal32 rhs) noexcept;
@@ -171,6 +173,8 @@ constexpr decimal32::decimal32(bool sign, std::integral auto mantissa, std::inte
     this->data_.sign = sign;
     this->data_.mantissa = mantissa;
     this->data_.expon = exponent;
+
+    this->normalize();
 }
 
 template <std::floating_point T>
@@ -293,6 +297,18 @@ template <typename T>
 {
     this->data_.sign = !this->data_.sign;
     return *this;
+}
+
+[[nodiscard]] constexpr decimal32 decimal32::operator*(decimal32 rhs) const noexcept
+{
+    return decimal32 {static_cast<bool>(this->sign() * rhs.sign()),
+                      this->mantissa() * rhs.mantissa(),
+                      this->exponent() + rhs.exponent()};
+}
+
+constexpr void decimal32::operator*=(decimal32 rhs) noexcept
+{
+    *this = *this * rhs;
 }
 
 [[nodiscard]] constexpr bool decimal32::operator==(decimal32 rhs) noexcept
