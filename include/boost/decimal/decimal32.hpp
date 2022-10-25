@@ -20,6 +20,7 @@
 #include <stdexcept>
 #include <limits>
 #include <string>
+#include <compare>
 #include "tools/config.hpp"
 
 #define BOOST_DECIMAL32_BITS            32
@@ -116,6 +117,8 @@ public:
     [[nodiscard]] constexpr bool operator!=(T rhs) noexcept;
 
     [[nodiscard]] constexpr decimal32 operator!() noexcept;
+
+    [[nodiscard]] constexpr bool operator>(decimal32 rhs) const noexcept;
 
     /// Getters to allow access to the bit layout
     [[nodiscard]] constexpr auto mantissa() const noexcept { return data_.mantissa; }
@@ -351,6 +354,29 @@ template <std::integral T>
     temp.data_.sign = !temp.data_.sign;
 
     return temp;
+}
+
+[[nodiscard]] constexpr bool decimal32::operator>(decimal32 rhs) const noexcept
+{
+    if (rhs.exponent() < this->exponent())
+    {
+        return true;
+    }
+    else if (rhs.exponent() > this->exponent())
+    {
+        return false;
+    }
+    
+    if(rhs.mantissa() < this->mantissa())
+    {
+        return true;
+    }
+    else if (rhs.mantissa() > this->mantissa())
+    {
+        return false;
+    }
+
+    return false;
 }
 
 /// Type alias to match STL
