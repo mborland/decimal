@@ -20,7 +20,12 @@ namespace boost {
 namespace decimal {
 namespace detail {
 
+// 32-bit MSVC 14.5 mis-codegens reads of bool members in over-aligned structs; use natural alignment there.
+#if defined(_MSC_VER) && !defined(_M_X64) && !defined(_M_ARM64)
+struct
+#else
 struct alignas(sizeof(std::uint64_t) * 4)
+#endif
 u256
 {
     std::uint64_t bytes[4] {};
