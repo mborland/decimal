@@ -87,7 +87,12 @@ constexpr auto write_payload(typename TargetDecimalType::significand_type payloa
 #  pragma warning(disable : 4324) // Structure was padded due to alignment specifier
 #endif
 
+// 32-bit MSVC mis-codegens reads of bool members in over-aligned structs; use natural alignment there.
+#if defined(_MSC_VER) && !defined(_M_X64) && !defined(_M_ARM64)
+BOOST_DECIMAL_EXPORT class decimal_fast128_t final
+#else
 BOOST_DECIMAL_EXPORT class alignas(16) decimal_fast128_t final
+#endif
 {
 public:
     using significand_type = int128::uint128_t;
