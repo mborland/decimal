@@ -28,6 +28,121 @@ namespace detail {
 #  pragma warning(disable : 4127) // Conditional expression is constant
 #endif
 
+// Returns the low 64 bits of an integer for parity testing. Specialized so the
+// templated kernel below can use one expression regardless of SigType width.
+BOOST_DECIMAL_CUDA_CONSTEXPR inline auto low64(std::uint64_t v) noexcept -> std::uint64_t { return v; }
+BOOST_DECIMAL_CUDA_CONSTEXPR inline auto low64(const int128::uint128_t& v) noexcept -> std::uint64_t { return v.low; }
+
+// Aligned-add kernel that stays in the narrower integer width (uint64 for d64,
+// uint128 for d128) instead of the kernel's normal promoted width (uint128 or
+// u256). Two precision-p operands shifted by up to `narrow_max_shift` digits
+// still fit in the narrow type. The kernel also handles the overflow shrink
+// inline via Wang/Schulte injection-style rounding (precomputed half-constants,
+// single divmod, round-half-to-even), avoiding the constructor's
+// num_digits + coefficient_rounding dispatch (~50 cycles per overflow case).
+//
+// Caller must guarantee:
+//   - default rounding mode is fe_dec_to_nearest
+//   - shift in [0, 3] where 0 means same-exponent (no multiply)
+//   - both operands non-zero (zero short-circuit happens upstream)
+template <typename ReturnType, typename SigType, typename ExpType>
+BOOST_DECIMAL_CUDA_CONSTEXPR auto aligned_add_kernel(
+    SigType big_lhs, SigType big_rhs,
+    ExpType lhs_exp, ExpType rhs_exp, unsigned shift,
+    bool lhs_sign, bool rhs_sign) noexcept -> ReturnType
+{
+    SigType a {};
+    SigType b {};
+    ExpType result_exp {};
+    if (shift == 0U)
+    {
+        a = big_lhs;
+        b = big_rhs;
+        result_exp = lhs_exp;
+    }
+    else
+    {
+        const auto pow_shift {detail::pow10<SigType>(static_cast<SigType>(shift))};
+        if (lhs_exp < rhs_exp)
+        {
+            a = big_lhs;
+            b = static_cast<SigType>(big_rhs * pow_shift);
+            result_exp = lhs_exp;
+        }
+        else
+        {
+            a = static_cast<SigType>(big_lhs * pow_shift);
+            b = big_rhs;
+            result_exp = rhs_exp;
+        }
+    }
+
+    if (lhs_sign == rhs_sign)
+    {
+        const SigType sum {static_cast<SigType>(a + b)};
+
+        constexpr SigType ten_to_p {
+            static_cast<SigType>(max_significand_v<ReturnType>) + SigType{1}};
+
+        if (sum < ten_to_p)
+        {
+            return ReturnType{sum, result_exp, lhs_sign};
+        }
+
+        // Overflow: determine extra digits via chained comparison (bounded by shift).
+        constexpr SigType ten_to_p_plus_1 {static_cast<SigType>(ten_to_p * SigType{10U})};
+        constexpr SigType ten_to_p_plus_2 {static_cast<SigType>(ten_to_p_plus_1 * SigType{10U})};
+
+        unsigned extra {1U};
+        SigType pow_extra {SigType{10U}};
+        SigType half {SigType{5U}};
+        if (sum >= ten_to_p_plus_1)
+        {
+            extra = 2U;
+            pow_extra = SigType{100U};
+            half = SigType{50U};
+            if (sum >= ten_to_p_plus_2)
+            {
+                extra = 3U;
+                pow_extra = SigType{1000U};
+                half = SigType{500U};
+            }
+        }
+
+        const auto dr {impl::divmod_pow10_dispatch(sum, static_cast<int>(extra), pow_extra)};
+        auto q {static_cast<SigType>(dr.quotient)};
+        const auto r {static_cast<SigType>(dr.remainder)};
+
+        if (r > half || (r == half && (low64(q) & UINT64_C(1)) != 0U))
+        {
+            ++q;
+            if (BOOST_DECIMAL_UNLIKELY(q == ten_to_p))
+            {
+                q = static_cast<SigType>(ten_to_p / SigType{10U});
+                ++extra;
+            }
+        }
+        return ReturnType{q, result_exp + static_cast<ExpType>(extra), lhs_sign};
+    }
+
+    // Opposite signs: magnitudes subtract. No overflow possible.
+    if (a >= b)
+    {
+        return ReturnType{static_cast<SigType>(a - b), result_exp, lhs_sign};
+    }
+    return ReturnType{static_cast<SigType>(b - a), result_exp, rhs_sign};
+}
+
+// Backwards-compatible aliases for the d128 callers that still use the old name.
+template <typename ReturnType, typename ExpType>
+BOOST_DECIMAL_CUDA_CONSTEXPR auto d128_uint128_aligned_kernel(
+    int128::uint128_t big_lhs, int128::uint128_t big_rhs,
+    ExpType lhs_exp, ExpType rhs_exp, unsigned shift,
+    bool lhs_sign, bool rhs_sign) noexcept -> ReturnType
+{
+    return aligned_add_kernel<ReturnType>(big_lhs, big_rhs, lhs_exp, rhs_exp, shift, lhs_sign, rhs_sign);
+}
+
 template <typename ReturnType, typename T>
 BOOST_DECIMAL_CUDA_CONSTEXPR auto add_impl(const T& lhs, const T& rhs) noexcept -> ReturnType
 {
@@ -62,6 +177,35 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto add_impl(const T& lhs, const T& rhs) noexcept 
     if (big_rhs == 0U)
     {
         return ReturnType{lhs.full_significand(), lhs.biased_exponent(), lhs.isneg()};
+    }
+
+    // Phase 3 fast paths for d64 (uint128 promoted) and d32 (uint64 promoted):
+    // when shift is small enough that everything fits in uint64, skip the uint128
+    // promotion entirely. For d64: max_sig (16 digits) * 10^3 = 19 digits < 2^64.
+    // For d32: max_sig (7 digits) * 10^3 = 10 digits < 2^64 (uint64 already).
+    BOOST_DECIMAL_IF_CONSTEXPR (detail::precision_v<ReturnType> <= 16)
+    {
+        constexpr unsigned u64_small_diff_limit {3U};
+        const auto exp_diff {lhs_exp - rhs_exp};
+        const auto shift_abs {exp_diff < 0 ? -exp_diff : exp_diff};
+        if (static_cast<unsigned>(shift_abs) <= u64_small_diff_limit)
+        {
+            bool default_rounding {_boost_decimal_global_rounding_mode == rounding_mode::fe_dec_to_nearest};
+            #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
+            if (!BOOST_DECIMAL_IS_CONSTANT_EVALUATED(lhs))
+            {
+                default_rounding = (_boost_decimal_global_runtime_rounding_mode == rounding_mode::fe_dec_to_nearest);
+            }
+            #endif
+            if (BOOST_DECIMAL_LIKELY(default_rounding))
+            {
+                return aligned_add_kernel<ReturnType, std::uint64_t>(
+                    static_cast<std::uint64_t>(big_lhs),
+                    static_cast<std::uint64_t>(big_rhs),
+                    lhs_exp, rhs_exp, static_cast<unsigned>(shift_abs),
+                    lhs.isneg(), rhs.isneg());
+            }
+        }
     }
 
     // Align to larger exponent
@@ -255,11 +399,54 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto d128_add_impl_new(const T& lhs, const T& rhs) 
         return ReturnType{lhs.full_significand(), lhs.biased_exponent(), lhs.isneg()};
     }
 
+    // Phase 1 same-exp fast path: stays in uint128 (no u256 promotion, no u256 trailing add).
+    // Default rounding only; non-default rounding falls through to the existing u256 path.
+    if (lhs_exp == rhs_exp)
+    {
+        bool default_rounding {_boost_decimal_global_rounding_mode == rounding_mode::fe_dec_to_nearest};
+        #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
+        if (!BOOST_DECIMAL_IS_CONSTANT_EVALUATED(lhs))
+        {
+            default_rounding = (_boost_decimal_global_runtime_rounding_mode == rounding_mode::fe_dec_to_nearest);
+        }
+        #endif
+        if (BOOST_DECIMAL_LIKELY(default_rounding))
+        {
+            return d128_uint128_aligned_kernel<ReturnType>(
+                big_lhs, big_rhs, lhs_exp, rhs_exp, 0U,
+                lhs.isneg(), rhs.isneg());
+        }
+    }
+
     // Align to larger exponent
     if (lhs_exp != rhs_exp)
     {
         constexpr auto max_shift {detail::make_positive_unsigned(std::numeric_limits<promoted_sig_type>::digits10 - detail::precision_v<ReturnType> - 1)};
         const auto shift {detail::make_positive_unsigned(lhs_exp - rhs_exp)};
+
+        // Phase 1 small-diff fast path: for shifts in [1, 3], the aligned multiply
+        // still fits in uint128 (precision 34 + shift 3 = 37 <= digits10(uint128) = 38).
+        // Skipping u256 saves ~50 cycles per op vs the u256 path below. Only taken
+        // under default rounding; the u256 slow path covers other modes.
+        // No LIKELY hint: random-exp workloads have shift >> 3, accumulation has
+        // shift <= 3, so neither prediction wins universally.
+        constexpr unsigned u128_small_diff_limit {3U};
+        if (shift <= u128_small_diff_limit)
+        {
+            bool default_rounding {_boost_decimal_global_rounding_mode == rounding_mode::fe_dec_to_nearest};
+            #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
+            if (!BOOST_DECIMAL_IS_CONSTANT_EVALUATED(lhs))
+            {
+                default_rounding = (_boost_decimal_global_runtime_rounding_mode == rounding_mode::fe_dec_to_nearest);
+            }
+            #endif
+            if (BOOST_DECIMAL_LIKELY(default_rounding))
+            {
+                return d128_uint128_aligned_kernel<ReturnType>(
+                    big_lhs, big_rhs, lhs_exp, rhs_exp, static_cast<unsigned>(shift),
+                    lhs.isneg(), rhs.isneg());
+            }
+        }
 
         if (shift > max_shift)
         {
