@@ -1337,6 +1337,11 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator<(const decimal128_t& lhs, const decim
     }
     #endif
 
+    if (BOOST_DECIMAL_UNLIKELY(lhs.bits_ == rhs.bits_))
+    {
+        return false;
+    }
+
     return less_parts_impl<decimal128_t>(lhs.full_significand(), lhs.biased_exponent(), lhs.isneg(),
                                        rhs.full_significand(), rhs.biased_exponent(), rhs.isneg());
 }
@@ -1469,16 +1474,17 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator<=>(const decimal128_t& lhs, const dec
     {
         return std::partial_ordering::less;
     }
-    else if (lhs > rhs)
+    if (rhs < lhs)
     {
         return std::partial_ordering::greater;
     }
-    else if (lhs == rhs)
+    #ifndef BOOST_DECIMAL_FAST_MATH
+    if (isnan(lhs) || isnan(rhs))
     {
-        return std::partial_ordering::equivalent;
+        return std::partial_ordering::unordered;
     }
-
-    return std::partial_ordering::unordered;
+    #endif
+    return std::partial_ordering::equivalent;
 }
 
 template <typename Integer>
