@@ -1712,14 +1712,15 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator+(const decimal128_t& lhs, const decim
     }
     #endif
 
-    // Dominant-operand short-circuit: max_shift in d128_add_impl_new = 42 (u256
-    // digits10 77 minus precision 34 minus 1) plus worst-case expansion shift 33
-    // = 75. Default rounding only.
+    // Two fast paths (see decimal64_t.hpp:operator+ for full explanation):
+    //   1. exp_diff > 75: dominant-operand return.
+    //   2. exp_diff <= 3: aligned_add_kernel in uint128 (max_sig 34 digits * 10^3
+    //      = 37 digits < 2^128), skipping to_components/expand_significand.
     {
         const auto lhs_exp {lhs.biased_exponent()};
         const auto rhs_exp {rhs.biased_exponent()};
         const auto exp_diff {lhs_exp > rhs_exp ? lhs_exp - rhs_exp : rhs_exp - lhs_exp};
-        if (exp_diff > 75)
+        if (exp_diff > 75 || exp_diff <= 3)
         {
             auto round {_boost_decimal_global_rounding_mode};
             #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
@@ -1730,7 +1731,18 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator+(const decimal128_t& lhs, const decim
             #endif
             if (BOOST_DECIMAL_LIKELY(round == rounding_mode::fe_dec_to_nearest))
             {
-                return lhs_exp > rhs_exp ? lhs : rhs;
+                if (exp_diff > 75)
+                {
+                    return lhs_exp > rhs_exp ? lhs : rhs;
+                }
+                const auto lhs_sig {lhs.full_significand()};
+                const auto rhs_sig {rhs.full_significand()};
+                if (BOOST_DECIMAL_LIKELY(lhs_sig != 0U && rhs_sig != 0U))
+                {
+                    return detail::aligned_add_kernel<decimal128_t, int128::uint128_t>(
+                        lhs_sig, rhs_sig, lhs_exp, rhs_exp, static_cast<unsigned>(exp_diff),
+                        lhs.isneg(), rhs.isneg());
+                }
             }
         }
     }
@@ -1794,12 +1806,12 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator-(const decimal128_t& lhs, const decim
     }
     #endif
 
-    // Dominant-operand short-circuit; see operator+ above for rationale.
+    // Two fast paths; see operator+ above. rhs sign is flipped for subtraction.
     {
         const auto lhs_exp {lhs.biased_exponent()};
         const auto rhs_exp {rhs.biased_exponent()};
         const auto exp_diff {lhs_exp > rhs_exp ? lhs_exp - rhs_exp : rhs_exp - lhs_exp};
-        if (exp_diff > 75)
+        if (exp_diff > 75 || exp_diff <= 3)
         {
             auto round {_boost_decimal_global_rounding_mode};
             #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
@@ -1810,7 +1822,18 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator-(const decimal128_t& lhs, const decim
             #endif
             if (BOOST_DECIMAL_LIKELY(round == rounding_mode::fe_dec_to_nearest))
             {
-                return lhs_exp > rhs_exp ? lhs : -rhs;
+                if (exp_diff > 75)
+                {
+                    return lhs_exp > rhs_exp ? lhs : -rhs;
+                }
+                const auto lhs_sig {lhs.full_significand()};
+                const auto rhs_sig {rhs.full_significand()};
+                if (BOOST_DECIMAL_LIKELY(lhs_sig != 0U && rhs_sig != 0U))
+                {
+                    return detail::aligned_add_kernel<decimal128_t, int128::uint128_t>(
+                        lhs_sig, rhs_sig, lhs_exp, rhs_exp, static_cast<unsigned>(exp_diff),
+                        lhs.isneg(), !rhs.isneg());
+                }
             }
         }
     }

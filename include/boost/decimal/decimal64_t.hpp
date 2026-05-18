@@ -1691,17 +1691,18 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator+(const decimal64_t lhs, const decimal
     }
     #endif
 
-    // Dominant-operand short-circuit: when the user-facing exponents differ by
-    // more than (max_shift + worst-case expansion) the slow path returns one
-    // operand unchanged anyway. Skip to_components/expand_significand on both
-    // operands and return directly. The threshold is conservative: max_shift
-    // (digits10(uint128) - precision_v - 1 = 21) plus worst-case expansion
-    // shift (precision_v - 1 = 15) = 36. Default rounding only.
+    // Two fast paths under default rounding, gated by user-facing exp_diff:
+    //   1. exp_diff > 36: slow path would return dominant operand unchanged; skip
+    //      to_components/expand_significand and return it directly.
+    //   2. exp_diff <= 3: aligned_add_kernel can do the whole add in uint64 (max_sig
+    //      16 digits * 10^3 = 19 digits < 2^64); skip to_components/expand_significand
+    //      and the add_impl dispatch entirely.
+    // The 4..36 band falls through to the existing slow path.
     {
         const auto lhs_exp {lhs.biased_exponent()};
         const auto rhs_exp {rhs.biased_exponent()};
         const auto exp_diff {lhs_exp > rhs_exp ? lhs_exp - rhs_exp : rhs_exp - lhs_exp};
-        if (exp_diff > 36)
+        if (exp_diff > 36 || exp_diff <= 3)
         {
             auto round {_boost_decimal_global_rounding_mode};
             #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
@@ -1712,7 +1713,18 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator+(const decimal64_t lhs, const decimal
             #endif
             if (BOOST_DECIMAL_LIKELY(round == rounding_mode::fe_dec_to_nearest))
             {
-                return lhs_exp > rhs_exp ? lhs : rhs;
+                if (exp_diff > 36)
+                {
+                    return lhs_exp > rhs_exp ? lhs : rhs;
+                }
+                const auto lhs_sig {lhs.full_significand()};
+                const auto rhs_sig {rhs.full_significand()};
+                if (BOOST_DECIMAL_LIKELY(lhs_sig != 0U && rhs_sig != 0U))
+                {
+                    return detail::aligned_add_kernel<decimal64_t, std::uint64_t>(
+                        lhs_sig, rhs_sig, lhs_exp, rhs_exp, static_cast<unsigned>(exp_diff),
+                        lhs.isneg(), rhs.isneg());
+                }
             }
         }
     }
@@ -1780,12 +1792,13 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator-(const decimal64_t lhs, const decimal
     }
     #endif
 
-    // Dominant-operand short-circuit; see operator+ above for rationale.
+    // Two fast paths (see operator+ above). For operator-, the rhs sign is flipped
+    // before dispatching to the kernel (subtraction = add with negated rhs).
     {
         const auto lhs_exp {lhs.biased_exponent()};
         const auto rhs_exp {rhs.biased_exponent()};
         const auto exp_diff {lhs_exp > rhs_exp ? lhs_exp - rhs_exp : rhs_exp - lhs_exp};
-        if (exp_diff > 36)
+        if (exp_diff > 36 || exp_diff <= 3)
         {
             auto round {_boost_decimal_global_rounding_mode};
             #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
@@ -1796,7 +1809,18 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator-(const decimal64_t lhs, const decimal
             #endif
             if (BOOST_DECIMAL_LIKELY(round == rounding_mode::fe_dec_to_nearest))
             {
-                return lhs_exp > rhs_exp ? lhs : -rhs;
+                if (exp_diff > 36)
+                {
+                    return lhs_exp > rhs_exp ? lhs : -rhs;
+                }
+                const auto lhs_sig {lhs.full_significand()};
+                const auto rhs_sig {rhs.full_significand()};
+                if (BOOST_DECIMAL_LIKELY(lhs_sig != 0U && rhs_sig != 0U))
+                {
+                    return detail::aligned_add_kernel<decimal64_t, std::uint64_t>(
+                        lhs_sig, rhs_sig, lhs_exp, rhs_exp, static_cast<unsigned>(exp_diff),
+                        lhs.isneg(), !rhs.isneg());
+                }
             }
         }
     }

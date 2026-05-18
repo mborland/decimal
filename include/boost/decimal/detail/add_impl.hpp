@@ -17,6 +17,7 @@
 
 #ifndef BOOST_DECIMAL_BUILD_MODULE
 #include <cstdint>
+#include <type_traits>
 #endif
 
 namespace boost {
@@ -110,60 +111,68 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto aligned_add_kernel(
         }
     }
 
+    // Compute result magnitude and sign uniformly for same-sign add and
+    // opposite-sign subtract.
+    SigType mag {};
+    bool result_sign {};
     if (lhs_sign == rhs_sign)
     {
-        const SigType sum {static_cast<SigType>(a + b)};
-
-        constexpr SigType ten_to_p {
-            static_cast<SigType>(max_significand_v<ReturnType>) + SigType{1}};
-
-        if (sum < ten_to_p)
-        {
-            return ReturnType{sum, result_exp, lhs_sign};
-        }
-
-        // Overflow: determine extra digits via chained comparison (bounded by shift).
-        constexpr SigType ten_to_p_plus_1 {static_cast<SigType>(ten_to_p * SigType{10U})};
-        constexpr SigType ten_to_p_plus_2 {static_cast<SigType>(ten_to_p_plus_1 * SigType{10U})};
-
-        unsigned extra {1U};
-        SigType pow_extra {SigType{10U}};
-        SigType half {SigType{5U}};
-        if (sum >= ten_to_p_plus_1)
-        {
-            extra = 2U;
-            pow_extra = SigType{100U};
-            half = SigType{50U};
-            if (sum >= ten_to_p_plus_2)
-            {
-                extra = 3U;
-                pow_extra = SigType{1000U};
-                half = SigType{500U};
-            }
-        }
-
-        const auto dr {impl::divmod_pow10_dispatch(sum, static_cast<int>(extra), pow_extra)};
-        auto q {static_cast<SigType>(dr.quotient)};
-        const auto r {static_cast<SigType>(dr.remainder)};
-
-        if (r > half || (r == half && (low64(q) & UINT64_C(1)) != 0U))
-        {
-            ++q;
-            if (BOOST_DECIMAL_UNLIKELY(q == ten_to_p))
-            {
-                q = static_cast<SigType>(ten_to_p / SigType{10U});
-                ++extra;
-            }
-        }
-        return ReturnType{q, result_exp + static_cast<ExpType>(extra), lhs_sign};
+        mag = static_cast<SigType>(a + b);
+        result_sign = lhs_sign;
     }
-
-    // Opposite signs: magnitudes subtract. No overflow possible.
-    if (a >= b)
+    else if (a >= b)
     {
-        return ReturnType{static_cast<SigType>(a - b), result_exp, lhs_sign};
+        mag = static_cast<SigType>(a - b);
+        result_sign = lhs_sign;
     }
-    return ReturnType{static_cast<SigType>(b - a), result_exp, rhs_sign};
+    else
+    {
+        mag = static_cast<SigType>(b - a);
+        result_sign = rhs_sign;
+    }
+
+    constexpr SigType ten_to_p {
+        static_cast<SigType>(max_significand_v<ReturnType>) + SigType{1}};
+
+    if (mag < ten_to_p)
+    {
+        return pack_in_range<ReturnType>(mag, result_exp, result_sign);
+    }
+
+    // Overflow: determine extra digits via chained comparison (bounded by shift).
+    constexpr SigType ten_to_p_plus_1 {static_cast<SigType>(ten_to_p * SigType{10U})};
+    constexpr SigType ten_to_p_plus_2 {static_cast<SigType>(ten_to_p_plus_1 * SigType{10U})};
+
+    unsigned extra {1U};
+    SigType pow_extra {SigType{10U}};
+    SigType half {SigType{5U}};
+    if (mag >= ten_to_p_plus_1)
+    {
+        extra = 2U;
+        pow_extra = SigType{100U};
+        half = SigType{50U};
+        if (mag >= ten_to_p_plus_2)
+        {
+            extra = 3U;
+            pow_extra = SigType{1000U};
+            half = SigType{500U};
+        }
+    }
+
+    const auto dr {impl::divmod_pow10_dispatch(mag, static_cast<int>(extra), pow_extra)};
+    auto q {static_cast<SigType>(dr.quotient)};
+    const auto r {static_cast<SigType>(dr.remainder)};
+
+    if (r > half || (r == half && (low64(q) & UINT64_C(1)) != 0U))
+    {
+        ++q;
+        if (BOOST_DECIMAL_UNLIKELY(q == ten_to_p))
+        {
+            q = static_cast<SigType>(ten_to_p / SigType{10U});
+            ++extra;
+        }
+    }
+    return pack_in_range<ReturnType>(q, result_exp + static_cast<ExpType>(extra), result_sign);
 }
 
 // Backwards-compatible aliases for the d128 callers that still use the old name.
@@ -216,7 +225,11 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto add_impl(const T& lhs, const T& rhs) noexcept 
     // when shift is small enough that everything fits in uint64, skip the uint128
     // promotion entirely. For d64: max_sig (16 digits) * 10^3 = 19 digits < 2^64.
     // For d32: max_sig (7 digits) * 10^3 = 10 digits < 2^64 (uint64 already).
-    BOOST_DECIMAL_IF_CONSTEXPR (detail::precision_v<ReturnType> <= 16)
+    // Guard: only enter when inputs are at the return type's precision
+    // (operator+/- callers); FMA passes wider promoted-precision components and
+    // must use the slow path (which calls coefficient_rounding to shrink).
+    BOOST_DECIMAL_IF_CONSTEXPR (detail::precision_v<ReturnType> <= 16
+        && std::is_same<typename T::significand_type, typename ReturnType::significand_type>::value)
     {
         constexpr unsigned u64_small_diff_limit {3U};
         const auto exp_diff {lhs_exp - rhs_exp};
@@ -432,8 +445,14 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto d128_add_impl_new(const T& lhs, const T& rhs) 
         return ReturnType{lhs.full_significand(), lhs.biased_exponent(), lhs.isneg()};
     }
 
+    // Phase 1 fast path guard: only enter when inputs are at the return type's
+    // precision (operator+/- callers); FMA passes promoted components (wider sigs).
+    constexpr bool fast_path_eligible {
+        std::is_same<typename T::significand_type, typename ReturnType::significand_type>::value};
+
     // Phase 1 same-exp fast path: stays in uint128 (no u256 promotion, no u256 trailing add).
     // Default rounding only; non-default rounding falls through to the existing u256 path.
+    BOOST_DECIMAL_IF_CONSTEXPR (fast_path_eligible)
     if (lhs_exp == rhs_exp)
     {
         bool default_rounding {_boost_decimal_global_rounding_mode == rounding_mode::fe_dec_to_nearest};
@@ -464,6 +483,7 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto d128_add_impl_new(const T& lhs, const T& rhs) 
         // No LIKELY hint: random-exp workloads have shift >> 3, accumulation has
         // shift <= 3, so neither prediction wins universally.
         constexpr unsigned u128_small_diff_limit {3U};
+        BOOST_DECIMAL_IF_CONSTEXPR (fast_path_eligible)
         if (shift <= u128_small_diff_limit)
         {
             bool default_rounding {_boost_decimal_global_rounding_mode == rounding_mode::fe_dec_to_nearest};
