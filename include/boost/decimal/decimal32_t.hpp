@@ -828,6 +828,33 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto from_bits(const std::uint32_t bits) noexcept -
 
 namespace detail {
 
+// IEEE-pack a known-in-range (coeff, exp, sign) triple into a decimal32_t,
+// skipping the constructor's bounds check + dead-branch handling. Caller
+// guarantees coeff <= d32_max_significand_value and (exp + bias) is in
+// [0, d32_max_biased_exponent].
+template <typename T1, typename T2>
+BOOST_DECIMAL_CUDA_CONSTEXPR auto direct_pack_d32(T1 coeff, T2 exp, bool sign) noexcept -> decimal32_t
+{
+    const auto reduced_coeff {static_cast<std::uint32_t>(coeff)};
+    const auto biased_exp {static_cast<std::uint32_t>(static_cast<int>(exp) + bias_v<decimal32_t>)};
+    std::uint32_t bits {sign ? d32_sign_mask : UINT32_C(0)};
+
+    if (reduced_coeff <= d32_biggest_no_combination_significand)
+    {
+        bits |= (reduced_coeff & d32_not_11_significand_mask);
+        bits |= (biased_exp << d32_not_11_exp_shift) & d32_not_11_exp_mask;
+    }
+    else
+    {
+        bits |= (d32_comb_11_mask | (reduced_coeff & d32_11_significand_mask));
+        bits |= (biased_exp << d32_11_exp_shift) & d32_11_exp_mask;
+    }
+    return from_bits(bits);
+}
+
+} // namespace detail (close to make the existing detail namespace block work)
+namespace detail {
+
 template <bool>
 class numeric_limits_impl32
 {

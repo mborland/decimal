@@ -598,6 +598,25 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto from_bits(const int128::uint128_t rhs) noexcep
     return result;
 }
 
+namespace detail {
+
+// IEEE-pack a known-in-range (coeff, exp, sign) triple into a decimal128_t,
+// skipping the constructor's bounds check + dead-branch handling. For d128
+// the precision (34 digits, 113 bits) always fits in not_11_significand_mask,
+// so no combination-field branch is needed. Caller guarantees
+// coeff <= d128_max_significand_value and (exp + bias) is in [0, d128_max_biased_exponent].
+template <typename T2>
+BOOST_DECIMAL_CUDA_CONSTEXPR auto direct_pack_d128(int128::uint128_t coeff, T2 exp, bool sign) noexcept -> decimal128_t
+{
+    const auto biased_exp {static_cast<std::uint64_t>(static_cast<int>(exp) + bias_v<decimal128_t>)};
+    int128::uint128_t bits {coeff & d128_not_11_significand_mask};
+    bits.high |= (sign ? d128_sign_mask : UINT64_C(0));
+    bits.high |= (biased_exp << d128_not_11_exp_high_word_shift) & d128_not_11_exp_mask;
+    return from_bits(bits);
+}
+
+} // namespace detail
+
 BOOST_DECIMAL_CUDA_CONSTEXPR auto decimal128_t::unbiased_exponent() const noexcept -> exponent_type
 {
     exponent_type expval {};

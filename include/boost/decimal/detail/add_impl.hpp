@@ -33,6 +33,39 @@ namespace detail {
 BOOST_DECIMAL_CUDA_CONSTEXPR inline auto low64(std::uint64_t v) noexcept -> std::uint64_t { return v; }
 BOOST_DECIMAL_CUDA_CONSTEXPR inline auto low64(const int128::uint128_t& v) noexcept -> std::uint64_t { return v.low; }
 
+// Forward declarations of the per-type IEEE direct-pack helpers (defined in
+// decimal{32,64,128}_t.hpp after the bit-mask constants). These skip the
+// generic constructor's bounds check + dead-branch handling for known-in-range
+// inputs, saving ~5-10 cycles per call.
+template <typename T1, typename T2>
+BOOST_DECIMAL_CUDA_CONSTEXPR auto direct_pack_d32(T1 coeff, T2 exp, bool sign) noexcept -> decimal32_t;
+template <typename T1, typename T2>
+BOOST_DECIMAL_CUDA_CONSTEXPR auto direct_pack_d64(T1 coeff, T2 exp, bool sign) noexcept -> decimal64_t;
+template <typename T2>
+BOOST_DECIMAL_CUDA_CONSTEXPR auto direct_pack_d128(int128::uint128_t coeff, T2 exp, bool sign) noexcept -> decimal128_t;
+
+// Dispatch helper: for IEEE return types use the corresponding direct_pack
+// helper; for fast types (and any other type) fall back to the regular
+// constructor. The fast types already have an inlined fast-pack path in their
+// constructor so the fallback is fine.
+template <typename ReturnType, typename SigType, typename ExpType>
+BOOST_DECIMAL_CUDA_CONSTEXPR auto pack_in_range(SigType coeff, ExpType exp, bool sign) noexcept -> ReturnType
+{
+    BOOST_DECIMAL_IF_CONSTEXPR (std::is_same<ReturnType, decimal32_t>::value)
+    {
+        return direct_pack_d32(static_cast<std::uint32_t>(coeff), exp, sign);
+    }
+    BOOST_DECIMAL_IF_CONSTEXPR (std::is_same<ReturnType, decimal64_t>::value)
+    {
+        return direct_pack_d64(static_cast<std::uint64_t>(coeff), exp, sign);
+    }
+    BOOST_DECIMAL_IF_CONSTEXPR (std::is_same<ReturnType, decimal128_t>::value)
+    {
+        return direct_pack_d128(static_cast<int128::uint128_t>(coeff), exp, sign);
+    }
+    return ReturnType{coeff, exp, sign};
+}
+
 // Aligned-add kernel that stays in the narrower integer width (uint64 for d64,
 // uint128 for d128) instead of the kernel's normal promoted width (uint128 or
 // u256). Two precision-p operands shifted by up to `narrow_max_shift` digits

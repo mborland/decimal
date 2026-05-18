@@ -603,6 +603,34 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto from_bits(std::uint64_t bits) noexcept -> deci
     return result;
 }
 
+namespace detail {
+
+// IEEE-pack a known-in-range (coeff, exp, sign) triple into a decimal64_t,
+// skipping the constructor's bounds check + dead-branch handling. Caller
+// guarantees coeff <= d64_max_significand_value and the (exp + bias) value
+// fits in [0, d64_max_biased_exponent]. Saves ~10 cycles per fast-path call.
+template <typename T1, typename T2>
+BOOST_DECIMAL_CUDA_CONSTEXPR auto direct_pack_d64(T1 coeff, T2 exp, bool sign) noexcept -> decimal64_t
+{
+    const auto reduced_coeff {static_cast<std::uint64_t>(coeff)};
+    const auto biased_exp {static_cast<std::uint64_t>(static_cast<int>(exp) + bias_v<decimal64_t>)};
+    std::uint64_t bits {sign ? d64_sign_mask : UINT64_C(0)};
+
+    if (reduced_coeff <= d64_biggest_no_combination_significand)
+    {
+        bits |= (reduced_coeff & d64_not_11_significand_mask);
+        bits |= (biased_exp << d64_not_11_exp_shift) & d64_not_11_exp_mask;
+    }
+    else
+    {
+        bits |= (d64_combination_field_mask | (reduced_coeff & d64_11_significand_mask));
+        bits |= (biased_exp << d64_11_exp_shift) & d64_11_exp_mask;
+    }
+    return from_bits(bits);
+}
+
+} // namespace detail
+
 constexpr auto to_bits(decimal64_t rhs) noexcept -> std::uint64_t
 {
     return rhs.bits_;
