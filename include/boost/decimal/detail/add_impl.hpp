@@ -46,25 +46,102 @@ template <typename T2>
 BOOST_DECIMAL_CUDA_CONSTEXPR auto direct_pack_d128(int128::uint128_t coeff, T2 exp, bool sign) noexcept -> decimal128_t;
 
 // Dispatch helper: for IEEE return types use the corresponding direct_pack
-// helper; for fast types (and any other type) fall back to the regular
-// constructor. The fast types already have an inlined fast-pack path in their
-// constructor so the fallback is fine.
+// helper if (exp + bias) is in the valid biased-exponent range; otherwise fall
+// back to the regular constructor which handles overflow-to-infinity and
+// subnormal flushing/re-canonicalization. For fast types always uses the
+// regular constructor.
 template <typename ReturnType, typename SigType, typename ExpType>
 BOOST_DECIMAL_CUDA_CONSTEXPR auto pack_in_range(SigType coeff, ExpType exp, bool sign) noexcept -> ReturnType
 {
     BOOST_DECIMAL_IF_CONSTEXPR (std::is_same<ReturnType, decimal32_t>::value)
     {
-        return direct_pack_d32(static_cast<std::uint32_t>(coeff), exp, sign);
+        const auto biased_exp_check {static_cast<int>(exp) + bias_v<decimal32_t>};
+        if (BOOST_DECIMAL_LIKELY(biased_exp_check >= 0
+            && biased_exp_check <= static_cast<int>(max_biased_exp_v<decimal32_t>)))
+        {
+            return direct_pack_d32(static_cast<std::uint32_t>(coeff), exp, sign);
+        }
+        return ReturnType{coeff, exp, sign};
     }
     BOOST_DECIMAL_IF_CONSTEXPR (std::is_same<ReturnType, decimal64_t>::value)
     {
-        return direct_pack_d64(static_cast<std::uint64_t>(coeff), exp, sign);
+        const auto biased_exp_check {static_cast<int>(exp) + bias_v<decimal64_t>};
+        if (BOOST_DECIMAL_LIKELY(biased_exp_check >= 0
+            && biased_exp_check <= static_cast<int>(max_biased_exp_v<decimal64_t>)))
+        {
+            return direct_pack_d64(static_cast<std::uint64_t>(coeff), exp, sign);
+        }
+        return ReturnType{coeff, exp, sign};
     }
     BOOST_DECIMAL_IF_CONSTEXPR (std::is_same<ReturnType, decimal128_t>::value)
     {
-        return direct_pack_d128(static_cast<int128::uint128_t>(coeff), exp, sign);
+        const auto biased_exp_check {static_cast<int>(exp) + bias_v<decimal128_t>};
+        if (BOOST_DECIMAL_LIKELY(biased_exp_check >= 0
+            && biased_exp_check <= static_cast<int>(max_biased_exp_v<decimal128_t>)))
+        {
+            return direct_pack_d128(static_cast<int128::uint128_t>(coeff), exp, sign);
+        }
+        return ReturnType{coeff, exp, sign};
     }
     return ReturnType{coeff, exp, sign};
+}
+
+// Inline shrink + pack for a sum/diff that exceeds max_significand_v. For 1-3
+// extra digits the bounds are determined by a chained comparison against the
+// precomputed thresholds. For >3 extra digits (post-alignment shifts up to ~21
+// for d64), a single num_digits call computes extra and pow10 looks up the
+// divisor. Either way the divide is one divmod_pow10 + round-half-to-even,
+// avoiding the constructor's coefficient_rounding dispatch.
+template <typename ReturnType, typename SigType, typename ExpType>
+BOOST_DECIMAL_CUDA_CONSTEXPR auto aligned_shrink_and_pack(
+    SigType mag, ExpType result_exp, bool result_sign) noexcept -> ReturnType
+{
+    constexpr SigType ten_to_p {
+        static_cast<SigType>(max_significand_v<ReturnType>) + SigType{1}};
+    constexpr SigType ten_to_p_plus_1 {static_cast<SigType>(ten_to_p * SigType{10U})};
+    constexpr SigType ten_to_p_plus_2 {static_cast<SigType>(ten_to_p_plus_1 * SigType{10U})};
+    constexpr SigType ten_to_p_plus_3 {static_cast<SigType>(ten_to_p_plus_2 * SigType{10U})};
+
+    unsigned extra {1U};
+    SigType pow_extra {SigType{10U}};
+    SigType half {SigType{5U}};
+    if (mag >= ten_to_p_plus_1)
+    {
+        extra = 2U;
+        pow_extra = SigType{100U};
+        half = SigType{50U};
+        if (mag >= ten_to_p_plus_2)
+        {
+            extra = 3U;
+            pow_extra = SigType{1000U};
+            half = SigType{500U};
+            if (BOOST_DECIMAL_UNLIKELY(mag >= ten_to_p_plus_3))
+            {
+                // Tall overflow (more than 3 extra digits): post-alignment
+                // shifts up to ~21 can land here for d64. Compute extra via
+                // num_digits and look up pow10.
+                const auto digits {num_digits(mag)};
+                extra = static_cast<unsigned>(digits - detail::precision_v<ReturnType>);
+                pow_extra = detail::pow10<SigType>(static_cast<SigType>(extra));
+                half = static_cast<SigType>(pow_extra / SigType{2U});
+            }
+        }
+    }
+
+    const auto dr {impl::divmod_pow10_dispatch(mag, static_cast<int>(extra), pow_extra)};
+    auto q {static_cast<SigType>(dr.quotient)};
+    const auto r {static_cast<SigType>(dr.remainder)};
+
+    if (r > half || (r == half && (low64(q) & UINT64_C(1)) != 0U))
+    {
+        ++q;
+        if (BOOST_DECIMAL_UNLIKELY(q == ten_to_p))
+        {
+            q = static_cast<SigType>(ten_to_p / SigType{10U});
+            ++extra;
+        }
+    }
+    return pack_in_range<ReturnType>(q, result_exp + static_cast<ExpType>(extra), result_sign);
 }
 
 // Aligned-add kernel that stays in the narrower integer width (uint64 for d64,
@@ -111,16 +188,26 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto aligned_add_kernel(
         }
     }
 
-    // Compute result magnitude and sign uniformly for same-sign add and
-    // opposite-sign subtract.
-    SigType mag {};
-    bool result_sign {};
+    // Same-sign: magnitudes add. Sum can overflow by up to `shift` digits
+    // (1 for shift=0 same-exp, up to `shift` for small-diff).
     if (lhs_sign == rhs_sign)
     {
-        mag = static_cast<SigType>(a + b);
-        result_sign = lhs_sign;
+        const SigType sum {static_cast<SigType>(a + b)};
+        constexpr SigType ten_to_p_ss {
+            static_cast<SigType>(max_significand_v<ReturnType>) + SigType{1}};
+        if (sum < ten_to_p_ss)
+        {
+            return pack_in_range<ReturnType>(sum, result_exp, lhs_sign);
+        }
+        return aligned_shrink_and_pack<ReturnType>(sum, result_exp, lhs_sign);
     }
-    else if (a >= b)
+
+    // Opposite signs: magnitudes subtract. For shift=0 the result <= max(a, b) <= max_sig
+    // so no overflow check is needed; for shift>0 the result can be up to
+    // max_sig * 10^shift and may need shrink.
+    SigType mag {};
+    bool result_sign {};
+    if (a >= b)
     {
         mag = static_cast<SigType>(a - b);
         result_sign = lhs_sign;
@@ -130,49 +217,18 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto aligned_add_kernel(
         mag = static_cast<SigType>(b - a);
         result_sign = rhs_sign;
     }
-
-    constexpr SigType ten_to_p {
+    if (shift == 0U)
+    {
+        // No overflow possible in same-exp opposite-sign subtraction.
+        return pack_in_range<ReturnType>(mag, result_exp, result_sign);
+    }
+    constexpr SigType ten_to_p_os {
         static_cast<SigType>(max_significand_v<ReturnType>) + SigType{1}};
-
-    if (mag < ten_to_p)
+    if (mag < ten_to_p_os)
     {
         return pack_in_range<ReturnType>(mag, result_exp, result_sign);
     }
-
-    // Overflow: determine extra digits via chained comparison (bounded by shift).
-    constexpr SigType ten_to_p_plus_1 {static_cast<SigType>(ten_to_p * SigType{10U})};
-    constexpr SigType ten_to_p_plus_2 {static_cast<SigType>(ten_to_p_plus_1 * SigType{10U})};
-
-    unsigned extra {1U};
-    SigType pow_extra {SigType{10U}};
-    SigType half {SigType{5U}};
-    if (mag >= ten_to_p_plus_1)
-    {
-        extra = 2U;
-        pow_extra = SigType{100U};
-        half = SigType{50U};
-        if (mag >= ten_to_p_plus_2)
-        {
-            extra = 3U;
-            pow_extra = SigType{1000U};
-            half = SigType{500U};
-        }
-    }
-
-    const auto dr {impl::divmod_pow10_dispatch(mag, static_cast<int>(extra), pow_extra)};
-    auto q {static_cast<SigType>(dr.quotient)};
-    const auto r {static_cast<SigType>(dr.remainder)};
-
-    if (r > half || (r == half && (low64(q) & UINT64_C(1)) != 0U))
-    {
-        ++q;
-        if (BOOST_DECIMAL_UNLIKELY(q == ten_to_p))
-        {
-            q = static_cast<SigType>(ten_to_p / SigType{10U});
-            ++extra;
-        }
-    }
-    return pack_in_range<ReturnType>(q, result_exp + static_cast<ExpType>(extra), result_sign);
+    return aligned_shrink_and_pack<ReturnType>(mag, result_exp, result_sign);
 }
 
 // Backwards-compatible aliases for the d128 callers that still use the old name.
@@ -222,19 +278,26 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto add_impl(const T& lhs, const T& rhs) noexcept 
     }
 
     // Phase 3 fast paths for d64 (uint128 promoted) and d32 (uint64 promoted):
-    // when shift is small enough that everything fits in uint64, skip the uint128
-    // promotion entirely. For d64: max_sig (16 digits) * 10^3 = 19 digits < 2^64.
-    // For d32: max_sig (7 digits) * 10^3 = 10 digits < 2^64 (uint64 already).
+    // dispatch via aligned_add_kernel which handles same-exp + small-diff + the
+    // overflow shrink inline (avoiding the constructor's coefficient_rounding).
+    //
+    // Two width-buckets:
+    //   - shift <= 3: stay in uint64 (max_sig 16 digits * 10^3 = 19 digits < 2^64).
+    //   - shift in [4, max_shift]: stay in uint128 (the existing promoted width,
+    //     but with inline shrink instead of the signed-add-then-construct path).
+    //
     // Guard: only enter when inputs are at the return type's precision
     // (operator+/- callers); FMA passes wider promoted-precision components and
-    // must use the slow path (which calls coefficient_rounding to shrink).
+    // must use the slow path.
     BOOST_DECIMAL_IF_CONSTEXPR (detail::precision_v<ReturnType> <= 16
         && std::is_same<typename T::significand_type, typename ReturnType::significand_type>::value)
     {
         constexpr unsigned u64_small_diff_limit {3U};
+        constexpr auto u128_max_shift {detail::make_positive_unsigned(
+            std::numeric_limits<promoted_sig_type>::digits10 - detail::precision_v<ReturnType> - 1)};
         const auto exp_diff {lhs_exp - rhs_exp};
-        const auto shift_abs {exp_diff < 0 ? -exp_diff : exp_diff};
-        if (static_cast<unsigned>(shift_abs) <= u64_small_diff_limit)
+        const auto shift_abs {static_cast<unsigned>(exp_diff < 0 ? -exp_diff : exp_diff)};
+        if (shift_abs <= static_cast<unsigned>(u128_max_shift))
         {
             bool default_rounding {_boost_decimal_global_rounding_mode == rounding_mode::fe_dec_to_nearest};
             #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
@@ -245,10 +308,17 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto add_impl(const T& lhs, const T& rhs) noexcept 
             #endif
             if (BOOST_DECIMAL_LIKELY(default_rounding))
             {
-                return aligned_add_kernel<ReturnType, std::uint64_t>(
-                    static_cast<std::uint64_t>(big_lhs),
-                    static_cast<std::uint64_t>(big_rhs),
-                    lhs_exp, rhs_exp, static_cast<unsigned>(shift_abs),
+                if (shift_abs <= u64_small_diff_limit)
+                {
+                    return aligned_add_kernel<ReturnType, std::uint64_t>(
+                        static_cast<std::uint64_t>(big_lhs),
+                        static_cast<std::uint64_t>(big_rhs),
+                        lhs_exp, rhs_exp, shift_abs,
+                        lhs.isneg(), rhs.isneg());
+                }
+                return aligned_add_kernel<ReturnType, promoted_sig_type>(
+                    big_lhs, big_rhs,
+                    lhs_exp, rhs_exp, shift_abs,
                     lhs.isneg(), rhs.isneg());
             }
         }

@@ -1052,33 +1052,32 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator+(const decimal32_t lhs, const decimal
     }
     #endif
 
-    // Two fast paths (see decimal64_t.hpp:operator+ for full explanation):
-    //   1. exp_diff > 17: dominant-operand return.
-    //   2. exp_diff <= 3: aligned_add_kernel in uint64 (max_sig 7 digits * 10^3
-    //      = 10 digits < 2^64), skipping to_components/expand_significand.
+    // Two fast paths (see decimal64_t.hpp:operator+ for full explanation).
+    // Both gated on non-zero operands so zero short-circuit logic is preserved
+    // by falling through to add_impl.
     {
-        const auto lhs_exp {lhs.biased_exponent()};
-        const auto rhs_exp {rhs.biased_exponent()};
-        const auto exp_diff {lhs_exp > rhs_exp ? lhs_exp - rhs_exp : rhs_exp - lhs_exp};
-        if (exp_diff > 17 || exp_diff <= 3)
+        const auto lhs_sig {lhs.full_significand()};
+        const auto rhs_sig {rhs.full_significand()};
+        if (BOOST_DECIMAL_LIKELY(lhs_sig != 0U && rhs_sig != 0U))
         {
-            auto round {_boost_decimal_global_rounding_mode};
-            #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
-            if (!BOOST_DECIMAL_IS_CONSTANT_EVALUATED(lhs))
+            const auto lhs_exp {lhs.biased_exponent()};
+            const auto rhs_exp {rhs.biased_exponent()};
+            const auto exp_diff {lhs_exp > rhs_exp ? lhs_exp - rhs_exp : rhs_exp - lhs_exp};
+            if (exp_diff > 17 || exp_diff <= 3)
             {
-                round = _boost_decimal_global_runtime_rounding_mode;
-            }
-            #endif
-            if (BOOST_DECIMAL_LIKELY(round == rounding_mode::fe_dec_to_nearest))
-            {
-                if (exp_diff > 17)
+                auto round {_boost_decimal_global_rounding_mode};
+                #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
+                if (!BOOST_DECIMAL_IS_CONSTANT_EVALUATED(lhs))
                 {
-                    return lhs_exp > rhs_exp ? lhs : rhs;
+                    round = _boost_decimal_global_runtime_rounding_mode;
                 }
-                const auto lhs_sig {lhs.full_significand()};
-                const auto rhs_sig {rhs.full_significand()};
-                if (BOOST_DECIMAL_LIKELY(lhs_sig != 0U && rhs_sig != 0U))
+                #endif
+                if (BOOST_DECIMAL_LIKELY(round == rounding_mode::fe_dec_to_nearest))
                 {
+                    if (exp_diff > 17)
+                    {
+                        return lhs_exp > rhs_exp ? lhs : rhs;
+                    }
                     return detail::aligned_add_kernel<decimal32_t, std::uint64_t>(
                         static_cast<std::uint64_t>(lhs_sig), static_cast<std::uint64_t>(rhs_sig),
                         lhs_exp, rhs_exp, static_cast<unsigned>(exp_diff),
@@ -1193,30 +1192,32 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator-(const decimal32_t lhs, const decimal
     }
     #endif
 
-    // Two fast paths; see operator+ above. rhs sign is flipped for subtraction.
+    // Two fast paths; see operator+ above. Both gated on non-zero operands so
+    // zero short-circuit logic is preserved by falling through. For operator-,
+    // rhs sign is flipped before kernel dispatch.
     {
-        const auto lhs_exp {lhs.biased_exponent()};
-        const auto rhs_exp {rhs.biased_exponent()};
-        const auto exp_diff {lhs_exp > rhs_exp ? lhs_exp - rhs_exp : rhs_exp - lhs_exp};
-        if (exp_diff > 17 || exp_diff <= 3)
+        const auto lhs_sig {lhs.full_significand()};
+        const auto rhs_sig {rhs.full_significand()};
+        if (BOOST_DECIMAL_LIKELY(lhs_sig != 0U && rhs_sig != 0U))
         {
-            auto round {_boost_decimal_global_rounding_mode};
-            #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
-            if (!BOOST_DECIMAL_IS_CONSTANT_EVALUATED(lhs))
+            const auto lhs_exp {lhs.biased_exponent()};
+            const auto rhs_exp {rhs.biased_exponent()};
+            const auto exp_diff {lhs_exp > rhs_exp ? lhs_exp - rhs_exp : rhs_exp - lhs_exp};
+            if (exp_diff > 17 || exp_diff <= 3)
             {
-                round = _boost_decimal_global_runtime_rounding_mode;
-            }
-            #endif
-            if (BOOST_DECIMAL_LIKELY(round == rounding_mode::fe_dec_to_nearest))
-            {
-                if (exp_diff > 17)
+                auto round {_boost_decimal_global_rounding_mode};
+                #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
+                if (!BOOST_DECIMAL_IS_CONSTANT_EVALUATED(lhs))
                 {
-                    return lhs_exp > rhs_exp ? lhs : -rhs;
+                    round = _boost_decimal_global_runtime_rounding_mode;
                 }
-                const auto lhs_sig {lhs.full_significand()};
-                const auto rhs_sig {rhs.full_significand()};
-                if (BOOST_DECIMAL_LIKELY(lhs_sig != 0U && rhs_sig != 0U))
+                #endif
+                if (BOOST_DECIMAL_LIKELY(round == rounding_mode::fe_dec_to_nearest))
                 {
+                    if (exp_diff > 17)
+                    {
+                        return lhs_exp > rhs_exp ? lhs : -rhs;
+                    }
                     return detail::aligned_add_kernel<decimal32_t, std::uint64_t>(
                         static_cast<std::uint64_t>(lhs_sig), static_cast<std::uint64_t>(rhs_sig),
                         lhs_exp, rhs_exp, static_cast<unsigned>(exp_diff),
