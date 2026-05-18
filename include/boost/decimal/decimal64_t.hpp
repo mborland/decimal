@@ -583,6 +583,9 @@ public:
     template <BOOST_DECIMAL_DECIMAL_FLOATING_TYPE T>
     friend constexpr auto frexp10(T num, int* expptr) noexcept -> typename T::significand_type;
 
+    template <BOOST_DECIMAL_DECIMAL_FLOATING_TYPE T>
+    friend BOOST_DECIMAL_CUDA_CONSTEXPR auto decompose(const T x) noexcept;
+
     friend BOOST_DECIMAL_CUDA_CONSTEXPR auto copysignd64(decimal64_t mag, decimal64_t sgn) noexcept -> decimal64_t;
     friend BOOST_DECIMAL_CUDA_CONSTEXPR auto scalbnd64(decimal64_t num, int exp) noexcept -> decimal64_t;
     friend BOOST_DECIMAL_CUDA_CONSTEXPR auto scalblnd64(decimal64_t num, long exp) noexcept -> decimal64_t;

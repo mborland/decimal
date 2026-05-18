@@ -564,6 +564,9 @@ public:
     template <BOOST_DECIMAL_DECIMAL_FLOATING_TYPE T>
     friend constexpr auto frexp10(T num, int* expptr) noexcept -> typename T::significand_type;
 
+    template <BOOST_DECIMAL_DECIMAL_FLOATING_TYPE T>
+    friend BOOST_DECIMAL_CUDA_CONSTEXPR auto decompose(const T x) noexcept;
+
     friend BOOST_DECIMAL_CUDA_CONSTEXPR auto copysignd128(decimal128_t mag, decimal128_t sgn) noexcept -> decimal128_t;
     friend BOOST_DECIMAL_CUDA_CONSTEXPR auto scalblnd128(decimal128_t num, long exp) noexcept -> decimal128_t;
     friend BOOST_DECIMAL_CUDA_CONSTEXPR auto scalbnd128(decimal128_t num, int exp) noexcept -> decimal128_t;
