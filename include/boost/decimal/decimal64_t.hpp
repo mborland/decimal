@@ -1663,6 +1663,32 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator+(const decimal64_t lhs, const decimal
     }
     #endif
 
+    // Dominant-operand short-circuit: when the user-facing exponents differ by
+    // more than (max_shift + worst-case expansion) the slow path returns one
+    // operand unchanged anyway. Skip to_components/expand_significand on both
+    // operands and return directly. The threshold is conservative: max_shift
+    // (digits10(uint128) - precision_v - 1 = 21) plus worst-case expansion
+    // shift (precision_v - 1 = 15) = 36. Default rounding only.
+    {
+        const auto lhs_exp {lhs.biased_exponent()};
+        const auto rhs_exp {rhs.biased_exponent()};
+        const auto exp_diff {lhs_exp > rhs_exp ? lhs_exp - rhs_exp : rhs_exp - lhs_exp};
+        if (exp_diff > 36)
+        {
+            auto round {_boost_decimal_global_rounding_mode};
+            #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
+            if (!BOOST_DECIMAL_IS_CONSTANT_EVALUATED(lhs))
+            {
+                round = _boost_decimal_global_runtime_rounding_mode;
+            }
+            #endif
+            if (BOOST_DECIMAL_LIKELY(round == rounding_mode::fe_dec_to_nearest))
+            {
+                return lhs_exp > rhs_exp ? lhs : rhs;
+            }
+        }
+    }
+
     auto lhs_components {lhs.to_components()};
     detail::expand_significand<decimal64_t>(lhs_components.sig, lhs_components.exp);
     auto rhs_components {rhs.to_components()};
@@ -1725,6 +1751,27 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator-(const decimal64_t lhs, const decimal
         return detail::check_non_finite(lhs, rhs);
     }
     #endif
+
+    // Dominant-operand short-circuit; see operator+ above for rationale.
+    {
+        const auto lhs_exp {lhs.biased_exponent()};
+        const auto rhs_exp {rhs.biased_exponent()};
+        const auto exp_diff {lhs_exp > rhs_exp ? lhs_exp - rhs_exp : rhs_exp - lhs_exp};
+        if (exp_diff > 36)
+        {
+            auto round {_boost_decimal_global_rounding_mode};
+            #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
+            if (!BOOST_DECIMAL_IS_CONSTANT_EVALUATED(lhs))
+            {
+                round = _boost_decimal_global_runtime_rounding_mode;
+            }
+            #endif
+            if (BOOST_DECIMAL_LIKELY(round == rounding_mode::fe_dec_to_nearest))
+            {
+                return lhs_exp > rhs_exp ? lhs : -rhs;
+            }
+        }
+    }
 
     auto lhs_components {lhs.to_components()};
     detail::expand_significand<decimal64_t>(lhs_components.sig, lhs_components.exp);
