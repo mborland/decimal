@@ -480,6 +480,9 @@ public:
     template <BOOST_DECIMAL_DECIMAL_FLOATING_TYPE T>
     friend constexpr auto frexp10(T num, int* expptr) noexcept -> typename T::significand_type;
 
+    template <BOOST_DECIMAL_DECIMAL_FLOATING_TYPE T>
+    friend BOOST_DECIMAL_CUDA_CONSTEXPR auto decompose(const T x) noexcept;
+
     friend constexpr auto copysignd32f(decimal_fast32_t mag, decimal_fast32_t sgn) noexcept -> decimal_fast32_t;
     friend constexpr auto scalbnd32f(decimal_fast32_t num, int exp) noexcept -> decimal_fast32_t;
     friend constexpr auto scalblnd32f(decimal_fast32_t num, long exp) noexcept -> decimal_fast32_t;

@@ -80,6 +80,7 @@
 #include <boost/decimal/detail/cmath/beta.hpp>
 #include <boost/decimal/detail/cmath/normalize.hpp>
 #include <boost/decimal/detail/cmath/comparetotal.hpp>
+#include <boost/decimal/detail/cmath/decompose.hpp>
 #include <boost/decimal/numbers.hpp>
 
 // Macros from 3.6.2
