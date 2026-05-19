@@ -154,148 +154,187 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_default_roundin
 
 } // namespace impl
 
-// Generic multiplication kernel. Two contracts share one entry point:
-//   (a) ReturnType is one of decimal{32,64,128}_t or decimal_fast{32,64,128}_t
-//       (i.e. is_decimal_floating_point_v<ReturnType> is true). The kernel
-//       expands both operands to full precision (no-op if already canonical),
+// Generic multiplication kernel. The body dispatches via SFINAE-disjoint
+// helpers (impl::mul_impl_ieee / impl::mul_impl_components) so each helper's
+// body is type-checked only for the ReturnType it actually serves
+// (BOOST_DECIMAL_IF_CONSTEXPR falls back to plain `if` in C++14 and would
+// otherwise force the FMA-only branch to resolve precision_v /
+// expand_significand / mul_finalize_* against component structs that don't
+// satisfy is_decimal_floating_point_v). The outer mul_impl signature stays
+// `-> ReturnType` so existing friend declarations in decimal_fast*_t headers
+// still match.
+//
+//   (a) ReturnType is one of decimal{32,64,128}_t or decimal_fast{32,64,128}_t.
+//       Expands both operands to full precision (no-op if already canonical),
 //       multiplies, then shrinks to exactly precision digits with
 //       round-half-to-even and packs via pack_in_range (direct_pack fast path
 //       for IEEE types; constructor fallback for fast types).
 //   (b) ReturnType is a *_components struct (FMA consumes the unrounded wider
-//       product before its add step). The kernel returns the raw product
-//       packed into the wider components type without shrinking.
+//       product before its add step). Returns the raw product packed into the
+//       wider components type without shrinking.
 
-template <typename ReturnType, typename T>
-BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_impl(const T& lhs, const T& rhs) noexcept -> ReturnType
+namespace impl {
+
+// Tag-dispatch helpers receive already-extracted components (so they don't
+// need friend access to the fast types' private to_components). The outer
+// mul_impl in the detail namespace below provides that access. Tag dispatch
+// (std::integral_constant) is used instead of `if constexpr` so the wrong
+// dispatcher isn't instantiated for any given ReturnType -- BOOST_DECIMAL_IF_CONSTEXPR
+// falls back to plain `if` in C++14 and would otherwise force both branches'
+// bodies to type-check.
+
+template <typename ReturnType, std::int32_t TVal, typename Components>
+BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_impl_dispatch(
+    Components lhs_c, Components rhs_c, std::true_type /*is_decimal_floating_point*/) noexcept -> ReturnType
 {
-    using mul_type = std::conditional_t<decimal_val_v<T> < 64, std::uint_fast64_t, int128::uint128_t>;
-
-    auto lhs_c {lhs.to_components()};
-    auto rhs_c {rhs.to_components()};
+    using mul_type = std::conditional_t<TVal < 64, std::uint_fast64_t, int128::uint128_t>;
     const bool sign {lhs_c.sign != rhs_c.sign};
 
-    BOOST_DECIMAL_IF_CONSTEXPR (detail::is_decimal_floating_point_v<ReturnType>)
+    // d32 IEEE: revert to the simple multiply + constructor handoff. The
+    // hardware uint64 divide the constructor's coefficient_rounding does
+    // is already cheap enough that the expand + pre-shrink + direct_pack
+    // path's overhead doesn't pay off here. d32_fast still benefits and
+    // continues to use the optimized path below.
+    BOOST_DECIMAL_IF_CONSTEXPR (std::is_same<ReturnType, decimal32_t>::value)
     {
-        // d32 IEEE: revert to the simple multiply + constructor handoff. The
-        // hardware uint64 divide the constructor's coefficient_rounding does
-        // is already cheap enough that the expand + pre-shrink + direct_pack
-        // path's overhead doesn't pay off here. d32_fast still benefits and
-        // continues to use the optimized path below.
-        BOOST_DECIMAL_IF_CONSTEXPR (std::is_same<ReturnType, decimal32_t>::value)
-        {
-            const auto res_sig {static_cast<mul_type>(lhs_c.sig) * static_cast<mul_type>(rhs_c.sig)};
-            const auto res_exp {lhs_c.exp + rhs_c.exp};
-            return ReturnType{res_sig, res_exp, sign};
-        }
-        else
-        {
-            // Small-product fast path: when at least one operand is
-            // non-canonical (sig below 10^(p-1)) AND the un-expanded product
-            // fits in p digits, the product itself is the result. Skip
-            // expand+shrink entirely and let pack_in_range route to direct_pack
-            // (or to the constructor for out-of-range biased_exp). Gated on
-            // sig comparisons so the canonical path pays only two compares.
-            using sig_t = typename ReturnType::significand_type;
-            constexpr auto min_normal_sig {detail::pow10<sig_t>(static_cast<sig_t>(detail::precision_v<ReturnType> - 1))};
-            if (BOOST_DECIMAL_UNLIKELY(lhs_c.sig < min_normal_sig || rhs_c.sig < min_normal_sig))
-            {
-                const auto small_prod {static_cast<mul_type>(lhs_c.sig) * static_cast<mul_type>(rhs_c.sig)};
-                constexpr mul_type small_threshold {static_cast<mul_type>(detail::max_significand_v<ReturnType>) + mul_type{1U}};
-                if (small_prod < small_threshold)
-                {
-                    return detail::pack_in_range<ReturnType>(static_cast<sig_t>(small_prod),
-                                                             lhs_c.exp + rhs_c.exp, sign);
-                }
-            }
-
-            // Fast types store significands at full precision already; expansion
-            // is a no-op for them so we skip the calls entirely. IEEE types can
-            // hold non-canonical cohorts and need the expansion to bring the
-            // significand up to precision digits before the threshold-based
-            // shrink in mul_finalize_*.
-            BOOST_DECIMAL_IF_CONSTEXPR (!detail::is_fast_type_v<ReturnType>)
-            {
-                detail::expand_significand<ReturnType>(lhs_c.sig, lhs_c.exp);
-                detail::expand_significand<ReturnType>(rhs_c.sig, rhs_c.exp);
-            }
-
-            const auto res_sig {static_cast<mul_type>(lhs_c.sig) * static_cast<mul_type>(rhs_c.sig)};
-            const auto res_exp {lhs_c.exp + rhs_c.exp};
-
-            // Zero canonicalization: a zero significand must go through the
-            // constructor so the IEEE zero-cohort encoding is emitted.
-            if (BOOST_DECIMAL_UNLIKELY(lhs_c.sig == 0U || rhs_c.sig == 0U))
-            {
-                return ReturnType{res_sig, res_exp, sign};
-            }
-            if (BOOST_DECIMAL_UNLIKELY(!impl::mul_default_rounding(lhs)))
-            {
-                // Non-default rounding mode: constructor's coefficient_rounding
-                // dispatches to fenv_round which honors the runtime mode.
-                return ReturnType{res_sig, res_exp, sign};
-            }
-            BOOST_DECIMAL_IF_CONSTEXPR (decimal_val_v<T> < 64)
-            {
-                return impl::mul_finalize_u64<ReturnType>(res_sig, res_exp, sign);
-            }
-            else
-            {
-                return impl::mul_finalize_u128<ReturnType>(res_sig, res_exp, sign);
-            }
-        }
+        const auto res_sig {static_cast<mul_type>(lhs_c.sig) * static_cast<mul_type>(rhs_c.sig)};
+        const auto res_exp {lhs_c.exp + rhs_c.exp};
+        return ReturnType{res_sig, res_exp, sign};
     }
     else
     {
-        // FMA components path: return wide product unrounded.
+        // Small-product fast path: when at least one operand is
+        // non-canonical (sig below 10^(p-1)) AND the un-expanded product
+        // fits in p digits, the product itself is the result. Skip
+        // expand+shrink entirely and let pack_in_range route to direct_pack
+        // (or to the constructor for out-of-range biased_exp). Gated on
+        // sig comparisons so the canonical path pays only two compares.
+        using sig_t = typename ReturnType::significand_type;
+        constexpr auto min_normal_sig {detail::pow10<sig_t>(static_cast<sig_t>(detail::precision_v<ReturnType> - 1))};
+        if (BOOST_DECIMAL_UNLIKELY(lhs_c.sig < min_normal_sig || rhs_c.sig < min_normal_sig))
+        {
+            const auto small_prod {static_cast<mul_type>(lhs_c.sig) * static_cast<mul_type>(rhs_c.sig)};
+            constexpr mul_type small_threshold {static_cast<mul_type>(detail::max_significand_v<ReturnType>) + mul_type{1U}};
+            if (small_prod < small_threshold)
+            {
+                return detail::pack_in_range<ReturnType>(static_cast<sig_t>(small_prod),
+                                                         lhs_c.exp + rhs_c.exp, sign);
+            }
+        }
+
+        // Fast types store significands at full precision already; expansion
+        // is a no-op for them so we skip the calls entirely. IEEE types can
+        // hold non-canonical cohorts and need the expansion to bring the
+        // significand up to precision digits before the threshold-based
+        // shrink in mul_finalize_*.
+        BOOST_DECIMAL_IF_CONSTEXPR (!detail::is_fast_type_v<ReturnType>)
+        {
+            detail::expand_significand<ReturnType>(lhs_c.sig, lhs_c.exp);
+            detail::expand_significand<ReturnType>(rhs_c.sig, rhs_c.exp);
+        }
+
         const auto res_sig {static_cast<mul_type>(lhs_c.sig) * static_cast<mul_type>(rhs_c.sig)};
         const auto res_exp {lhs_c.exp + rhs_c.exp};
-        return {res_sig, res_exp, sign};
+
+        // Zero canonicalization: a zero significand must go through the
+        // constructor so the IEEE zero-cohort encoding is emitted.
+        if (BOOST_DECIMAL_UNLIKELY(lhs_c.sig == 0U || rhs_c.sig == 0U))
+        {
+            return ReturnType{res_sig, res_exp, sign};
+        }
+        if (BOOST_DECIMAL_UNLIKELY(!impl::mul_default_rounding(lhs_c.sig)))
+        {
+            // Non-default rounding mode: constructor's coefficient_rounding
+            // dispatches to fenv_round which honors the runtime mode.
+            return ReturnType{res_sig, res_exp, sign};
+        }
+        BOOST_DECIMAL_IF_CONSTEXPR (TVal < 64)
+        {
+            // The static_cast is identity in this branch (mul_type is uint_fast64_t
+            // when TVal < 64) but is required to make the d64/d128 instantiation
+            // type-check in C++14, where BOOST_DECIMAL_IF_CONSTEXPR is plain `if`
+            // and both branches must be valid even though the wide-width branch
+            // is unreachable at runtime.
+            return impl::mul_finalize_u64<ReturnType>(static_cast<std::uint_fast64_t>(res_sig), res_exp, sign);
+        }
+        else
+        {
+            return impl::mul_finalize_u128<ReturnType>(res_sig, res_exp, sign);
+        }
     }
+}
+
+template <typename ReturnType, std::int32_t TVal, typename Components>
+BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_impl_dispatch(
+    Components lhs_c, Components rhs_c, std::false_type /*is_decimal_floating_point*/) noexcept -> ReturnType
+{
+    // FMA components path: return wide product unrounded. ReturnType is a
+    // decimal_components<SigType, BiasedExpType> struct (decimal_val_v defined,
+    // but no precision_v / max_significand_v / direct_pack_*), so the
+    // optimized path's helpers above don't apply.
+    using mul_type = std::conditional_t<TVal < 64, std::uint_fast64_t, int128::uint128_t>;
+    const bool sign {lhs_c.sign != rhs_c.sign};
+    const auto res_sig {static_cast<mul_type>(lhs_c.sig) * static_cast<mul_type>(rhs_c.sig)};
+    const auto res_exp {lhs_c.exp + rhs_c.exp};
+    return {res_sig, res_exp, sign};
+}
+
+} // namespace impl
+
+// Outer mul_impl: keeps the original `-> ReturnType` signature so friend
+// declarations in decimal_fast*_t headers match. Extracts components via the
+// (friend-accessible) to_components() and tag-dispatches to SFINAE-disjoint
+// impl helpers. Tag dispatch (rather than if-constexpr) ensures only the
+// matching helper body is instantiated for any given ReturnType -- BOOST_DECIMAL_IF_CONSTEXPR
+// falls back to plain `if` in C++14, which would force both branches to
+// type-check.
+template <typename ReturnType, typename T>
+BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_impl(const T& lhs, const T& rhs) noexcept -> ReturnType
+{
+    return impl::mul_impl_dispatch<ReturnType, decimal_val_v<T>>(
+        lhs.to_components(), rhs.to_components(),
+        std::integral_constant<bool, detail::is_decimal_floating_point_v<ReturnType>>{});
 }
 
 template <typename ReturnType, typename T, typename U>
 BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_impl(T lhs_sig, U lhs_exp, bool lhs_sign,
                                                    T rhs_sig, U rhs_exp, bool rhs_sign) noexcept -> ReturnType
 {
+    // d32 * Integer (sole caller) always passes an IEEE/fast decimal ReturnType.
+    // The body references mul_finalize_u64<ReturnType> and expand_significand,
+    // both valid for is_decimal_floating_point_v<ReturnType>==true types. No
+    // SFINAE constraint needed because no FMA path uses this tuple form
+    // (FMA's mul_impl call passes pre-extracted components to the dec-ref form).
     using mul_type = std::uint_fast64_t;
     const bool sign {lhs_sign != rhs_sign};
 
-    BOOST_DECIMAL_IF_CONSTEXPR (detail::is_decimal_floating_point_v<ReturnType>)
-    {
-        // d32 IEEE: revert to the simple multiply + constructor handoff (see
-        // generic mul_impl above for rationale).
-        BOOST_DECIMAL_IF_CONSTEXPR (std::is_same<ReturnType, decimal32_t>::value)
-        {
-            const auto res_sig {static_cast<mul_type>(lhs_sig) * static_cast<mul_type>(rhs_sig)};
-            const auto res_exp {lhs_exp + rhs_exp};
-            return ReturnType{res_sig, res_exp, sign};
-        }
-
-        BOOST_DECIMAL_IF_CONSTEXPR (!detail::is_fast_type_v<ReturnType>)
-        {
-            detail::expand_significand<ReturnType>(lhs_sig, lhs_exp);
-            detail::expand_significand<ReturnType>(rhs_sig, rhs_exp);
-        }
-
-        const auto res_sig {static_cast<mul_type>(lhs_sig) * static_cast<mul_type>(rhs_sig)};
-        const auto res_exp {lhs_exp + rhs_exp};
-
-        if (BOOST_DECIMAL_UNLIKELY(lhs_sig == 0U || rhs_sig == 0U))
-        {
-            return ReturnType{res_sig, res_exp, sign};
-        }
-        if (BOOST_DECIMAL_UNLIKELY(!impl::mul_default_rounding(lhs_sig)))
-        {
-            return ReturnType{res_sig, res_exp, sign};
-        }
-        return impl::mul_finalize_u64<ReturnType>(res_sig, res_exp, sign);
-    }
-    else
+    // d32 IEEE: revert to the simple multiply + constructor handoff (see
+    // generic mul_impl above for rationale).
+    BOOST_DECIMAL_IF_CONSTEXPR (std::is_same<ReturnType, decimal32_t>::value)
     {
         const auto res_sig {static_cast<mul_type>(lhs_sig) * static_cast<mul_type>(rhs_sig)};
         const auto res_exp {lhs_exp + rhs_exp};
-        return {static_cast<std::uint32_t>(res_sig), res_exp, sign};
+        return ReturnType{res_sig, res_exp, sign};
     }
+
+    BOOST_DECIMAL_IF_CONSTEXPR (!detail::is_fast_type_v<ReturnType>)
+    {
+        detail::expand_significand<ReturnType>(lhs_sig, lhs_exp);
+        detail::expand_significand<ReturnType>(rhs_sig, rhs_exp);
+    }
+
+    const auto res_sig {static_cast<mul_type>(lhs_sig) * static_cast<mul_type>(rhs_sig)};
+    const auto res_exp {lhs_exp + rhs_exp};
+
+    if (BOOST_DECIMAL_UNLIKELY(lhs_sig == 0U || rhs_sig == 0U))
+    {
+        return ReturnType{res_sig, res_exp, sign};
+    }
+    if (BOOST_DECIMAL_UNLIKELY(!impl::mul_default_rounding(lhs_sig)))
+    {
+        return ReturnType{res_sig, res_exp, sign};
+    }
+    return impl::mul_finalize_u64<ReturnType>(res_sig, res_exp, sign);
 }
 
 // d64 specialization. Used by `decimal_fast64_t * decimal_fast64_t` (which
