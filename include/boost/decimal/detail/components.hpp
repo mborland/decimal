@@ -60,6 +60,11 @@ struct decimal_components
         return sign;
     }
 
+    BOOST_DECIMAL_CUDA_CONSTEXPR auto to_components() const -> decimal_components
+    {
+        return *this;
+    }
+
     template <typename T1, typename T2>
     explicit BOOST_DECIMAL_CUDA_CONSTEXPR operator decimal_components<T1, T2>() const
     {
