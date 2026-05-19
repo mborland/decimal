@@ -862,6 +862,26 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto direct_pack_d32(T1 coeff, T2 exp, bool sign) n
     return from_bits(bits);
 }
 
+// Definition of the pack_in_range<decimal32_t> overload declared in
+// add_impl.hpp. Lives here because the body's `decimal32_t{coeff, exp, sign}`
+// fallback constructor call requires decimal32_t to be a complete type --
+// both C++14 (regular if) and nvcc (eager template body parse for device
+// codegen) would otherwise reject the constructor call when the function
+// was defined at the add_impl.hpp include site (where decimal32_t is still
+// forward-declared via fwd.hpp).
+template <typename ReturnType, typename SigType, typename ExpType>
+BOOST_DECIMAL_CUDA_CONSTEXPR auto pack_in_range(SigType coeff, ExpType exp, bool sign) noexcept
+    -> std::enable_if_t<std::is_same<ReturnType, decimal32_t>::value, decimal32_t>
+{
+    const auto biased_exp_check {static_cast<int>(exp) + bias_v<decimal32_t>};
+    if (BOOST_DECIMAL_LIKELY(biased_exp_check >= 0
+        && biased_exp_check <= static_cast<int>(max_biased_exp_v<decimal32_t>)))
+    {
+        return direct_pack_d32(static_cast<std::uint32_t>(coeff), exp, sign);
+    }
+    return decimal32_t{coeff, exp, sign};
+}
+
 } // namespace detail (close to make the existing detail namespace block work)
 namespace detail {
 

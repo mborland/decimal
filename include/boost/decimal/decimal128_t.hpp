@@ -615,6 +615,22 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto direct_pack_d128(int128::uint128_t coeff, T2 e
     return from_bits(bits);
 }
 
+// Definition of the pack_in_range<decimal128_t> overload declared in
+// add_impl.hpp. Lives here so the `decimal128_t{coeff, exp, sign}` fallback
+// is parsed only after decimal128_t is complete (see add_impl.hpp rationale).
+template <typename ReturnType, typename SigType, typename ExpType>
+BOOST_DECIMAL_CUDA_CONSTEXPR auto pack_in_range(SigType coeff, ExpType exp, bool sign) noexcept
+    -> std::enable_if_t<std::is_same<ReturnType, decimal128_t>::value, decimal128_t>
+{
+    const auto biased_exp_check {static_cast<int>(exp) + bias_v<decimal128_t>};
+    if (BOOST_DECIMAL_LIKELY(biased_exp_check >= 0
+        && biased_exp_check <= static_cast<int>(max_biased_exp_v<decimal128_t>)))
+    {
+        return direct_pack_d128(static_cast<int128::uint128_t>(coeff), exp, sign);
+    }
+    return decimal128_t{coeff, exp, sign};
+}
+
 } // namespace detail
 
 BOOST_DECIMAL_CUDA_CONSTEXPR auto decimal128_t::unbiased_exponent() const noexcept -> exponent_type

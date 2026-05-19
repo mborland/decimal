@@ -51,54 +51,31 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto direct_pack_d128(int128::uint128_t coeff, T2 e
 // subnormal flushing/re-canonicalization. For fast types always uses the
 // regular constructor.
 //
-// Implemented as SFINAE-disjoint overloads rather than an `if constexpr` chain
-// because BOOST_DECIMAL_IF_CONSTEXPR falls back to plain `if` in C++14, which
-// would force the d128 branch's `direct_pack_d128` body (returning the
-// still-forward-declared decimal128_t) to be type-checked from add_impl.hpp's
-// include site inside decimal32_t.hpp. With overloads, each body only
-// references the specific decimal type it returns, so each overload's body is
-// type-checked only when actually instantiated for that ReturnType -- by which
-// point the corresponding decimal*_t header is included and the type is complete.
+// SFINAE-disjoint overloads rather than an `if constexpr` chain because
+// BOOST_DECIMAL_IF_CONSTEXPR falls back to plain `if` in C++14, which would
+// force the d128 branch's `direct_pack_d128` body to be type-checked from
+// add_impl.hpp's include site (where decimal128_t is still forward-declared).
+//
+// The IEEE-type overloads are declared here but DEFINED in their respective
+// decimal*_t.hpp headers, after each class is complete. This avoids parsing
+// `decimal32_t{coeff, exp, sign}` (etc.) constructor calls in an environment
+// where the type is incomplete -- both C++14 (regular if) and nvcc, which
+// eagerly compiles function template bodies for device codegen, would
+// otherwise reject the incomplete-type expressions.
 template <typename ReturnType, typename SigType, typename ExpType>
 BOOST_DECIMAL_CUDA_CONSTEXPR auto pack_in_range(SigType coeff, ExpType exp, bool sign) noexcept
-    -> std::enable_if_t<std::is_same<ReturnType, decimal32_t>::value, decimal32_t>
-{
-    const auto biased_exp_check {static_cast<int>(exp) + bias_v<decimal32_t>};
-    if (BOOST_DECIMAL_LIKELY(biased_exp_check >= 0
-        && biased_exp_check <= static_cast<int>(max_biased_exp_v<decimal32_t>)))
-    {
-        return direct_pack_d32(static_cast<std::uint32_t>(coeff), exp, sign);
-    }
-    return decimal32_t{coeff, exp, sign};
-}
+    -> std::enable_if_t<std::is_same<ReturnType, decimal32_t>::value, decimal32_t>;
 
 template <typename ReturnType, typename SigType, typename ExpType>
 BOOST_DECIMAL_CUDA_CONSTEXPR auto pack_in_range(SigType coeff, ExpType exp, bool sign) noexcept
-    -> std::enable_if_t<std::is_same<ReturnType, decimal64_t>::value, decimal64_t>
-{
-    const auto biased_exp_check {static_cast<int>(exp) + bias_v<decimal64_t>};
-    if (BOOST_DECIMAL_LIKELY(biased_exp_check >= 0
-        && biased_exp_check <= static_cast<int>(max_biased_exp_v<decimal64_t>)))
-    {
-        return direct_pack_d64(static_cast<std::uint64_t>(coeff), exp, sign);
-    }
-    return decimal64_t{coeff, exp, sign};
-}
+    -> std::enable_if_t<std::is_same<ReturnType, decimal64_t>::value, decimal64_t>;
 
 template <typename ReturnType, typename SigType, typename ExpType>
 BOOST_DECIMAL_CUDA_CONSTEXPR auto pack_in_range(SigType coeff, ExpType exp, bool sign) noexcept
-    -> std::enable_if_t<std::is_same<ReturnType, decimal128_t>::value, decimal128_t>
-{
-    const auto biased_exp_check {static_cast<int>(exp) + bias_v<decimal128_t>};
-    if (BOOST_DECIMAL_LIKELY(biased_exp_check >= 0
-        && biased_exp_check <= static_cast<int>(max_biased_exp_v<decimal128_t>)))
-    {
-        return direct_pack_d128(static_cast<int128::uint128_t>(coeff), exp, sign);
-    }
-    return decimal128_t{coeff, exp, sign};
-}
+    -> std::enable_if_t<std::is_same<ReturnType, decimal128_t>::value, decimal128_t>;
 
 // Fallback for fast types and components -- always uses the regular constructor.
+// Defined here because its body doesn't reference any specific IEEE decimal type.
 template <typename ReturnType, typename SigType, typename ExpType>
 BOOST_DECIMAL_CUDA_CONSTEXPR auto pack_in_range(SigType coeff, ExpType exp, bool sign) noexcept
     -> std::enable_if_t<!std::is_same<ReturnType, decimal32_t>::value

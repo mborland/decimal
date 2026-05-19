@@ -631,6 +631,22 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto direct_pack_d64(T1 coeff, T2 exp, bool sign) n
     return from_bits(bits);
 }
 
+// Definition of the pack_in_range<decimal64_t> overload declared in
+// add_impl.hpp. Lives here so the `decimal64_t{coeff, exp, sign}` fallback
+// is parsed only after decimal64_t is complete (see add_impl.hpp rationale).
+template <typename ReturnType, typename SigType, typename ExpType>
+BOOST_DECIMAL_CUDA_CONSTEXPR auto pack_in_range(SigType coeff, ExpType exp, bool sign) noexcept
+    -> std::enable_if_t<std::is_same<ReturnType, decimal64_t>::value, decimal64_t>
+{
+    const auto biased_exp_check {static_cast<int>(exp) + bias_v<decimal64_t>};
+    if (BOOST_DECIMAL_LIKELY(biased_exp_check >= 0
+        && biased_exp_check <= static_cast<int>(max_biased_exp_v<decimal64_t>)))
+    {
+        return direct_pack_d64(static_cast<std::uint64_t>(coeff), exp, sign);
+    }
+    return decimal64_t{coeff, exp, sign};
+}
+
 } // namespace detail
 
 constexpr auto to_bits(decimal64_t rhs) noexcept -> std::uint64_t
