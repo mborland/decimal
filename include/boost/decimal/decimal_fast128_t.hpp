@@ -1284,7 +1284,7 @@ constexpr auto operator*(const decimal_fast128_t& lhs, const Integer rhs) noexce
     exp_type rhs_exp {0};
     detail::normalize<decimal_fast128_t>(rhs_sig, rhs_exp);
 
-    return detail::d128_fast_mul_impl<decimal_fast128_t>(
+    return detail::d128_mul_impl<decimal_fast128_t>(
             lhs.significand_, lhs.biased_exponent(), lhs.sign_,
             rhs_sig, rhs_exp, (rhs < 0));
 }
