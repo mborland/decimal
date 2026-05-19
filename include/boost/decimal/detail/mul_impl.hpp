@@ -47,15 +47,18 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_finalize_u64(
     std::uint_fast64_t product, ExpType result_exp, bool result_sign) noexcept -> ReturnType
 {
     using mul_type = std::uint_fast64_t;
+
     int extra {6};
     if (product >= UINT64_C(10000000000000)) // 10^13
     {
         extra = 7;
     }
+
     const auto pow_extra {static_cast<mul_type>(detail::pow10<std::uint64_t>(static_cast<std::uint64_t>(extra)))};
     auto q {static_cast<mul_type>(product / pow_extra)};
     const auto r {static_cast<mul_type>(product - q * pow_extra)};
     const auto half {static_cast<mul_type>(pow_extra >> 1)};
+
     if (r > half || (r == half && (q & UINT64_C(1)) != 0U))
     {
         ++q;
@@ -65,6 +68,7 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_finalize_u64(
             ++extra;
         }
     }
+
     return detail::pack_in_range<ReturnType>(static_cast<std::uint32_t>(q),
                                              result_exp + static_cast<ExpType>(extra),
                                              result_sign);
@@ -76,16 +80,19 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_finalize_u128(
     int128::uint128_t product, ExpType result_exp, bool result_sign) noexcept -> ReturnType
 {
     constexpr auto threshold {detail::pow10<int128::uint128_t>(int128::uint128_t{UINT64_C(31)})};
+
     int extra {15};
     if (product >= threshold)
     {
         extra = 16;
     }
+
     const auto pow_extra {detail::pow10<int128::uint128_t>(int128::uint128_t{static_cast<std::uint64_t>(extra)})};
     const auto dr {detail::impl::divmod_pow10_dispatch(product, extra, pow_extra)};
     auto q {dr.quotient};
     const auto r {dr.remainder};
     const auto half {pow_extra >> 1};
+
     if (r > half || (r == half && (q.low & UINT64_C(1)) != 0U))
     {
         ++q;
@@ -96,6 +103,7 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_finalize_u128(
             ++extra;
         }
     }
+
     return detail::pack_in_range<ReturnType>(static_cast<std::uint64_t>(q.low),
                                              result_exp + static_cast<ExpType>(extra),
                                              result_sign);
@@ -111,11 +119,13 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_finalize_u256(
     {
         extra = 34;
     }
+
     const auto pow_extra {detail::pow10(u256{static_cast<std::uint64_t>(extra)})};
     const auto dr {detail::impl::divmod_pow10_dispatch(product, extra, pow_extra)};
     auto q {dr.quotient};
     const auto r {dr.remainder};
     const auto half {pow_extra >> 1};
+
     if (r > half || (r == half && (q.bytes[0] & UINT64_C(1)) != 0U))
     {
         ++q;
@@ -126,6 +136,7 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_finalize_u256(
             ++extra;
         }
     }
+
     const int128::uint128_t q_u128 {q.bytes[1], q.bytes[0]};
     return detail::pack_in_range<ReturnType>(q_u128,
                                              result_exp + static_cast<ExpType>(extra),
@@ -140,14 +151,13 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_finalize_u256(
 template <typename Anchor>
 BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_default_rounding(const Anchor& anchor) noexcept -> bool
 {
+    static_cast<void>(anchor);
     bool default_rounding {_boost_decimal_global_rounding_mode == rounding_mode::fe_dec_to_nearest};
     #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
     if (!BOOST_DECIMAL_IS_CONSTANT_EVALUATED(anchor))
     {
         default_rounding = (_boost_decimal_global_runtime_rounding_mode == rounding_mode::fe_dec_to_nearest);
     }
-    #else
-    static_cast<void>(anchor);
     #endif
     return default_rounding;
 }
@@ -273,9 +283,11 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_impl_dispatch(
     // but no precision_v / max_significand_v / direct_pack_*), so the
     // optimized path's helpers above don't apply.
     using mul_type = std::conditional_t<TVal < 64, std::uint_fast64_t, int128::uint128_t>;
+
     const bool sign {lhs_c.sign != rhs_c.sign};
     const auto res_sig {static_cast<mul_type>(lhs_c.sig) * static_cast<mul_type>(rhs_c.sig)};
     const auto res_exp {lhs_c.exp + rhs_c.exp};
+
     return {res_sig, res_exp, sign};
 }
 
@@ -306,6 +318,7 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_impl(T lhs_sig,
     // SFINAE constraint needed because no FMA path uses this tuple form
     // (FMA's mul_impl call passes pre-extracted components to the dec-ref form).
     using mul_type = std::uint_fast64_t;
+
     const bool sign {lhs_sign != rhs_sign};
 
     // d32 IEEE: revert to the simple multiply + constructor handoff (see
@@ -334,6 +347,7 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_impl(T lhs_sig,
     {
         return ReturnType{res_sig, res_exp, sign};
     }
+
     return impl::mul_finalize_u64<ReturnType>(res_sig, res_exp, sign);
 }
 
@@ -368,6 +382,7 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto d64_mul_impl(const 
     {
         return ReturnType{res_sig, res_exp, sign};
     }
+
     return impl::mul_finalize_u128<ReturnType>(res_sig, res_exp, sign);
 }
 
@@ -377,6 +392,7 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto d64_mul_impl(T lhs_
                                                        -> std::enable_if_t<detail::is_decimal_floating_point_v<ReturnType>, ReturnType>
 {
     using unsigned_int128_type = boost::int128::uint128_t;
+
     const bool sign {lhs_sign != rhs_sign};
 
     BOOST_DECIMAL_IF_CONSTEXPR (!detail::is_fast_type_v<ReturnType>)
@@ -396,6 +412,7 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto d64_mul_impl(T lhs_
     {
         return ReturnType{res_sig, res_exp, sign};
     }
+
     return impl::mul_finalize_u128<ReturnType>(res_sig, res_exp, sign);
 }
 
@@ -406,6 +423,7 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto d128_mul_impl(const T1& lhs_sig_in, const U1 l
                              const T2& rhs_sig_in, const U2 rhs_exp_in, const bool rhs_sign) noexcept -> ReturnType
 {
     using sig_type = T1;
+
     static_assert(std::is_same<sig_type, T2>::value, "Should have a common type by this point");
 
     const bool sign {lhs_sign != rhs_sign};
@@ -484,13 +502,16 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto d128_mul_impl(const T1& lhs_sig_in, const U1 l
         const auto sig_dig {detail::num_digits(res_sig)};
         const auto digit_delta {sig_dig - std::numeric_limits<sig_type>::digits10};
         auto res_exp_mut {res_exp};
+
         if (BOOST_DECIMAL_LIKELY(digit_delta > 0))
         {
             auto biased_exp {res_exp_mut + detail::bias_v<ReturnType>};
             detail::coefficient_rounding<ReturnType>(res_sig, res_exp_mut, biased_exp, sign, sig_dig);
         }
+
         return detail::pack_in_range<ReturnType>(int128::uint128_t{res_sig[1], res_sig[0]}, res_exp_mut, sign);
     }
+
     return impl::mul_finalize_u256<ReturnType>(res_sig, res_exp, sign);
 }
 
