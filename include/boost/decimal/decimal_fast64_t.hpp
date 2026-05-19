@@ -1173,6 +1173,36 @@ constexpr auto operator+(const decimal_fast64_t lhs, const decimal_fast64_t rhs)
     }
     #endif
 
+    // Dominant-operand short-circuit: when exp_diff exceeds max_shift in
+    // add_impl (= digits10(uint128) - precision - 1 = 21 for d64) the slow path
+    // returns one operand unchanged anyway. Skip the whole add_impl call. Fast
+    // types maintain canonical significands so the threshold has no
+    // worst-case-expansion buffer (unlike the IEEE 36 threshold).
+    {
+        const auto lhs_sig {lhs.full_significand()};
+        const auto rhs_sig {rhs.full_significand()};
+        if (BOOST_DECIMAL_LIKELY(lhs_sig != 0U && rhs_sig != 0U))
+        {
+            const auto lhs_exp {lhs.biased_exponent()};
+            const auto rhs_exp {rhs.biased_exponent()};
+            const auto exp_diff {lhs_exp > rhs_exp ? lhs_exp - rhs_exp : rhs_exp - lhs_exp};
+            if (exp_diff > 21)
+            {
+                auto round {_boost_decimal_global_rounding_mode};
+                #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
+                if (!BOOST_DECIMAL_IS_CONSTANT_EVALUATED(lhs))
+                {
+                    round = _boost_decimal_global_runtime_rounding_mode;
+                }
+                #endif
+                if (BOOST_DECIMAL_LIKELY(round == rounding_mode::fe_dec_to_nearest))
+                {
+                    return lhs_exp > rhs_exp ? lhs : rhs;
+                }
+            }
+        }
+    }
+
     return detail::add_impl<decimal_fast64_t>(lhs, rhs);
 }
 
@@ -1226,6 +1256,32 @@ constexpr auto operator-(const decimal_fast64_t lhs, decimal_fast64_t rhs) noexc
         return detail::check_non_finite(lhs, rhs);
     }
     #endif
+
+    // Dominant-operand short-circuit; see operator+ above.
+    {
+        const auto lhs_sig {lhs.full_significand()};
+        const auto rhs_sig {rhs.full_significand()};
+        if (BOOST_DECIMAL_LIKELY(lhs_sig != 0U && rhs_sig != 0U))
+        {
+            const auto lhs_exp {lhs.biased_exponent()};
+            const auto rhs_exp {rhs.biased_exponent()};
+            const auto exp_diff {lhs_exp > rhs_exp ? lhs_exp - rhs_exp : rhs_exp - lhs_exp};
+            if (exp_diff > 21)
+            {
+                auto round {_boost_decimal_global_rounding_mode};
+                #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
+                if (!BOOST_DECIMAL_IS_CONSTANT_EVALUATED(lhs))
+                {
+                    round = _boost_decimal_global_runtime_rounding_mode;
+                }
+                #endif
+                if (BOOST_DECIMAL_LIKELY(round == rounding_mode::fe_dec_to_nearest))
+                {
+                    return lhs_exp > rhs_exp ? lhs : -rhs;
+                }
+            }
+        }
+    }
 
     rhs.sign_ = !rhs.sign_;
 
