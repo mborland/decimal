@@ -750,9 +750,14 @@ BOOST_DECIMAL_CUDA_CONSTEXPR decimal32_t::decimal32_t(T1 coeff, T2 exp, const de
         }
         else if (digit_delta > 0 && coeff_digits + digit_delta <= detail::precision)
         {
+            // After the shift, coeff has coeff_digits+digit_delta <= precision digits
+            // (so coeff <= max_significand_v) and biased_exp lands in [0, max] because
+            // we just subtracted exactly the overflow delta from exp. pack_in_range
+            // hits direct_pack on this in-range case; the fallback constructor is a
+            // safety belt if the analysis is wrong (same as the original recursion).
             exp -= digit_delta;
             reduced_coeff *= detail::pow10(static_cast<significand_type>(digit_delta));
-            *this = decimal32_t(reduced_coeff, exp, is_negative);
+            *this = detail::pack_in_range<decimal32_t>(reduced_coeff, exp, is_negative);
         }
         else if (coeff_digits + biased_exp <= detail::precision)
         {
@@ -786,11 +791,14 @@ BOOST_DECIMAL_CUDA_CONSTEXPR decimal32_t::decimal32_t(T1 coeff, T2 exp, const de
         }
         else if (digit_delta < 0 && coeff_digits - digit_delta <= detail::precision)
         {
-            // We can expand the coefficient to use the maximum number of digits
+            // We can expand the coefficient to use the maximum number of digits.
+            // After expansion, coeff has precision digits (<= max_significand_v) and
+            // biased_exp lands in [0, max] (we shift toward the valid range). Same
+            // pack_in_range pattern as the digit_delta > 0 branch above.
             const auto offset {detail::precision - coeff_digits};
             exp -= offset;
             reduced_coeff *= detail::pow10(static_cast<significand_type>(offset));
-            *this = decimal32_t(reduced_coeff, exp, is_negative);
+            *this = detail::pack_in_range<decimal32_t>(reduced_coeff, exp, is_negative);
         }
         else
         {
@@ -839,7 +847,9 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto direct_pack_d32(T1 coeff, T2 exp, bool sign) n
     const auto biased_exp {static_cast<std::uint32_t>(static_cast<int>(exp) + bias_v<decimal32_t>)};
     std::uint32_t bits {sign ? d32_sign_mask : UINT32_C(0)};
 
-    if (reduced_coeff <= d32_biggest_no_combination_significand)
+    // The non-combination encoding holds coefficients up to d32_biggest_no_combination_significand,
+    // which covers ~95%+ of post-arithmetic coefficients. The combination-field branch is cold.
+    if (BOOST_DECIMAL_LIKELY(reduced_coeff <= d32_biggest_no_combination_significand))
     {
         bits |= (reduced_coeff & d32_not_11_significand_mask);
         bits |= (biased_exp << d32_not_11_exp_shift) & d32_not_11_exp_mask;

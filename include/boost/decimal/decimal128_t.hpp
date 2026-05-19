@@ -838,9 +838,11 @@ BOOST_DECIMAL_CUDA_CONSTEXPR decimal128_t::decimal128_t(T1 coeff, T2 exp, const 
         }
         else if (digit_delta > 0 && coeff_digits + digit_delta <= detail::precision_v<decimal128_t>)
         {
+            // Same overflow-fold pattern as d32/d64: post-shift coeff is <= max_significand_v
+            // and biased_exp lands in [0, max], so pack_in_range routes to direct_pack.
             exp -= digit_delta;
             reduced_coeff *= detail::pow10(static_cast<significand_type>(digit_delta));
-            *this = decimal128_t(reduced_coeff, exp, is_negative);
+            *this = detail::pack_in_range<decimal128_t>(reduced_coeff, exp, is_negative);
         }
         else if (coeff_digits + biased_exp <= detail::precision_v<decimal128_t>)
         {
@@ -875,10 +877,12 @@ BOOST_DECIMAL_CUDA_CONSTEXPR decimal128_t::decimal128_t(T1 coeff, T2 exp, const 
         }
         else if (digit_delta < 0 && coeff_digits - digit_delta <= detail::precision_v<decimal128_t>)
         {
+            // Expand to use the full precision; biased_exp ends up in [0, max] and
+            // coeff <= max_significand_v. pack_in_range routes to direct_pack.
             const auto offset {detail::precision_v<decimal128_t> - coeff_digits};
             exp -= offset;
             reduced_coeff *= detail::pow10(static_cast<significand_type>(offset));
-            *this = decimal128_t(reduced_coeff, exp, is_negative);
+            *this = detail::pack_in_range<decimal128_t>(reduced_coeff, exp, is_negative);
         }
         else
         {
@@ -1954,14 +1958,11 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator*(const decimal128_t lhs, const Intege
 
     auto lhs_sig {lhs.full_significand()};
     auto lhs_exp {lhs.biased_exponent()};
-    const auto lhs_zeros {detail::remove_trailing_zeros(lhs_sig)};
-    lhs_sig = lhs_zeros.trimmed_number;
-    lhs_exp += static_cast<std::int32_t>(lhs_zeros.number_of_removed_zeros);
+    detail::expand_significand<decimal128_t>(lhs_sig, lhs_exp);
 
     auto rhs_sig {static_cast<int128::uint128_t>(detail::make_positive_unsigned(rhs))};
-    const auto rhs_zeros {detail::remove_trailing_zeros(rhs_sig)};
-    rhs_sig = rhs_zeros.trimmed_number;
-    const auto rhs_exp = static_cast<exp_type>(rhs_zeros.number_of_removed_zeros);
+    exp_type rhs_exp {0};
+    detail::normalize<decimal128_t>(rhs_sig, rhs_exp);
 
     return detail::d128_mul_impl<decimal128_t>(
             lhs_sig, lhs_exp, lhs.isneg(),

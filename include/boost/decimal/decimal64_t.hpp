@@ -616,7 +616,9 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto direct_pack_d64(T1 coeff, T2 exp, bool sign) n
     const auto biased_exp {static_cast<std::uint64_t>(static_cast<int>(exp) + bias_v<decimal64_t>)};
     std::uint64_t bits {sign ? d64_sign_mask : UINT64_C(0)};
 
-    if (reduced_coeff <= d64_biggest_no_combination_significand)
+    // The non-combination encoding holds coefficients up to d64_biggest_no_combination_significand,
+    // which covers ~95%+ of post-arithmetic coefficients. The combination-field branch is cold.
+    if (BOOST_DECIMAL_LIKELY(reduced_coeff <= d64_biggest_no_combination_significand))
     {
         bits |= (reduced_coeff & d64_not_11_significand_mask);
         bits |= (biased_exp << d64_not_11_exp_shift) & d64_not_11_exp_mask;
@@ -773,9 +775,12 @@ BOOST_DECIMAL_CUDA_CONSTEXPR decimal64_t::decimal64_t(T1 coeff, T2 exp, const de
         }
         else if (digit_delta > 0 && coeff_digits + digit_delta <= detail::precision_v<decimal64_t>)
         {
+            // Coeff stays in range (<= max_significand_v) by the branch's digit budget,
+            // and biased_exp lands in [0, max] by construction. pack_in_range hits
+            // direct_pack on the in-range case; fallback constructor is a safety belt.
             exp -= digit_delta;
             reduced_coeff *= detail::pow10(static_cast<significand_type>(digit_delta));
-            *this = decimal64_t(reduced_coeff, exp, is_negative);
+            *this = detail::pack_in_range<decimal64_t>(reduced_coeff, exp, is_negative);
         }
         else if (coeff_digits + biased_exp <= detail::precision_v<decimal64_t>)
         {
@@ -809,20 +814,26 @@ BOOST_DECIMAL_CUDA_CONSTEXPR decimal64_t::decimal64_t(T1 coeff, T2 exp, const de
         }
         else if (digit_delta < 0 && coeff_digits - digit_delta <= detail::precision_v<decimal64_t>)
         {
+            // Expand to use the full precision; biased_exp ends up in [0, max] and
+            // coeff <= max_significand_v. pack_in_range routes to direct_pack.
             const auto offset {detail::precision_v<decimal64_t> - coeff_digits};
             exp -= offset;
             reduced_coeff *= detail::pow10(static_cast<significand_type>(offset));
-            *this = decimal64_t(reduced_coeff, exp, is_negative);
+            *this = detail::pack_in_range<decimal64_t>(reduced_coeff, exp, is_negative);
         }
         else if (biased_exp > detail::max_biased_exp_v<decimal64_t>)
         {
-            // Similar to subnormals, but for extremely large values
+            // Similar to subnormals, but for extremely large values: fold the
+            // overflow into the coefficient via trailing zeros when there's room.
             const auto available_space {detail::precision_v<decimal64_t> - coeff_digits};
             if (available_space >= exp_delta)
             {
+                // available_space >= exp_delta means after subtracting exp_delta from
+                // biased_exp it lands in [0, max], and coeff has coeff_digits + available_space
+                // <= precision digits, so <= max_significand_v. pack_in_range applies.
                 reduced_coeff *= detail::pow10(static_cast<significand_type>(available_space));
                 exp -= available_space;
-                *this = decimal64_t(reduced_coeff, exp, is_negative);
+                *this = detail::pack_in_range<decimal64_t>(reduced_coeff, exp, is_negative);
             }
             else
             {
