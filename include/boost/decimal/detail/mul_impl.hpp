@@ -191,6 +191,12 @@ namespace impl {
 // falls back to plain `if` in C++14 and would otherwise force both branches'
 // bodies to type-check.
 
+#ifdef _MSC_VER
+#  pragma warning(push)
+#  pragma warning(disable : 4127)
+#  pragma warning(disable : 4702) // Complains that unlikely branches are unreachable
+#endif
+
 template <typename ReturnType, std::int32_t TVal, typename Components>
 BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_impl_dispatch(
     Components lhs_c, Components rhs_c, std::true_type /*is_decimal_floating_point*/) noexcept -> ReturnType
@@ -306,11 +312,6 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_impl(const T& l
         std::integral_constant<bool, detail::is_decimal_floating_point_v<ReturnType>>{});
 }
 
-#ifdef _MSC_VER
-#  pragma warning(push)
-#  pragma warning(disable : 4702) // Complains that unlikely branches are unreachable
-#endif
-
 template <typename ReturnType, typename T, typename U>
 BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_impl(T lhs_sig, U lhs_exp, const bool lhs_sign,
                                                    T rhs_sig, U rhs_exp, const bool rhs_sign) noexcept -> ReturnType
@@ -353,10 +354,6 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_impl(T lhs_sig,
 
     return impl::mul_finalize_u64<ReturnType>(res_sig, res_exp, sign);
 }
-
-#ifdef _MSC_VER
-#  pragma warning(pop)
-#endif
 
 // d64 specialization. Used by `decimal_fast64_t * decimal_fast64_t` (which
 // passes decimal types directly without to_components conversion) and by the
@@ -521,6 +518,10 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto d128_mul_impl(const T1& lhs_sig_in, const U1 l
 
     return impl::mul_finalize_u256<ReturnType>(res_sig, res_exp, sign);
 }
+
+#ifdef _MSC_VER
+#  pragma warning(pop)
+#endif
 
 } // namespace detail
 } // namespace decimal
