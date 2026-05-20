@@ -46,18 +46,16 @@ template <typename ReturnType, typename ExpType>
 BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_finalize_u64(
     std::uint_fast64_t product, ExpType result_exp, bool result_sign) noexcept -> ReturnType
 {
-    using mul_type = std::uint_fast64_t;
-
     int extra {6};
     if (product >= UINT64_C(10000000000000)) // 10^13
     {
         extra = 7;
     }
 
-    const auto pow_extra {static_cast<mul_type>(detail::pow10<std::uint64_t>(static_cast<std::uint64_t>(extra)))};
-    auto q {static_cast<mul_type>(product / pow_extra)};
-    const auto r {static_cast<mul_type>(product - q * pow_extra)};
-    const auto half {static_cast<mul_type>(pow_extra >> 1)};
+    const auto pow_extra {detail::pow10<std::uint64_t>(static_cast<std::uint64_t>(extra))};
+    auto q {product / pow_extra};
+    const auto r {product - q * pow_extra};
+    const auto half {pow_extra >> 1};
 
     if (r > half || (r == half && (q & UINT64_C(1)) != 0U))
     {
