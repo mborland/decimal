@@ -598,6 +598,41 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto from_bits(const int128::uint128_t rhs) noexcep
     return result;
 }
 
+namespace detail {
+
+// IEEE-pack a known-in-range (coeff, exp, sign) triple into a decimal128_t,
+// skipping the constructor's bounds check + dead-branch handling. For d128
+// the precision (34 digits, 113 bits) always fits in not_11_significand_mask,
+// so no combination-field branch is needed. Caller guarantees
+// coeff <= d128_max_significand_value and (exp + bias) is in [0, d128_max_biased_exponent].
+template <typename T2>
+BOOST_DECIMAL_CUDA_CONSTEXPR auto direct_pack_d128(int128::uint128_t coeff, T2 exp, bool sign) noexcept -> decimal128_t
+{
+    const auto biased_exp {static_cast<std::uint64_t>(static_cast<int>(exp) + bias_v<decimal128_t>)};
+    int128::uint128_t bits {coeff & d128_not_11_significand_mask};
+    bits.high |= (sign ? d128_sign_mask : UINT64_C(0));
+    bits.high |= (biased_exp << d128_not_11_exp_high_word_shift) & d128_not_11_exp_mask;
+    return from_bits(bits);
+}
+
+// Definition of the pack_in_range<decimal128_t> overload declared in
+// add_impl.hpp. Lives here so the `decimal128_t{coeff, exp, sign}` fallback
+// is parsed only after decimal128_t is complete (see add_impl.hpp rationale).
+template <typename ReturnType, typename SigType, typename ExpType>
+BOOST_DECIMAL_CUDA_CONSTEXPR auto pack_in_range(SigType coeff, ExpType exp, bool sign) noexcept
+    -> std::enable_if_t<std::is_same<ReturnType, decimal128_t>::value, decimal128_t>
+{
+    const auto biased_exp_check {static_cast<int>(exp) + bias_v<decimal128_t>};
+    if (BOOST_DECIMAL_LIKELY(biased_exp_check >= 0
+        && biased_exp_check <= static_cast<int>(max_biased_exp_v<decimal128_t>)))
+    {
+        return direct_pack_d128(static_cast<int128::uint128_t>(coeff), exp, sign);
+    }
+    return decimal128_t{coeff, exp, sign};
+}
+
+} // namespace detail
+
 BOOST_DECIMAL_CUDA_CONSTEXPR auto decimal128_t::unbiased_exponent() const noexcept -> exponent_type
 {
     exponent_type expval {};
@@ -819,9 +854,11 @@ BOOST_DECIMAL_CUDA_CONSTEXPR decimal128_t::decimal128_t(T1 coeff, T2 exp, const 
         }
         else if (digit_delta > 0 && coeff_digits + digit_delta <= detail::precision_v<decimal128_t>)
         {
+            // Same overflow-fold pattern as d32/d64: post-shift coeff is <= max_significand_v
+            // and biased_exp lands in [0, max], so pack_in_range routes to direct_pack.
             exp -= digit_delta;
             reduced_coeff *= detail::pow10(static_cast<significand_type>(digit_delta));
-            *this = decimal128_t(reduced_coeff, exp, is_negative);
+            *this = detail::pack_in_range<decimal128_t>(reduced_coeff, exp, is_negative);
         }
         else if (coeff_digits + biased_exp <= detail::precision_v<decimal128_t>)
         {
@@ -856,10 +893,12 @@ BOOST_DECIMAL_CUDA_CONSTEXPR decimal128_t::decimal128_t(T1 coeff, T2 exp, const 
         }
         else if (digit_delta < 0 && coeff_digits - digit_delta <= detail::precision_v<decimal128_t>)
         {
+            // Expand to use the full precision; biased_exp ends up in [0, max] and
+            // coeff <= max_significand_v. pack_in_range routes to direct_pack.
             const auto offset {detail::precision_v<decimal128_t> - coeff_digits};
             exp -= offset;
             reduced_coeff *= detail::pow10(static_cast<significand_type>(offset));
-            *this = decimal128_t(reduced_coeff, exp, is_negative);
+            *this = detail::pack_in_range<decimal128_t>(reduced_coeff, exp, is_negative);
         }
         else
         {
@@ -1337,6 +1376,11 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator<(const decimal128_t& lhs, const decim
     }
     #endif
 
+    if (BOOST_DECIMAL_UNLIKELY(lhs.bits_ == rhs.bits_))
+    {
+        return false;
+    }
+
     return less_parts_impl<decimal128_t>(lhs.full_significand(), lhs.biased_exponent(), lhs.isneg(),
                                        rhs.full_significand(), rhs.biased_exponent(), rhs.isneg());
 }
@@ -1469,16 +1513,17 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator<=>(const decimal128_t& lhs, const dec
     {
         return std::partial_ordering::less;
     }
-    else if (lhs > rhs)
+    if (rhs < lhs)
     {
         return std::partial_ordering::greater;
     }
-    else if (lhs == rhs)
+    #ifndef BOOST_DECIMAL_FAST_MATH
+    if (isnan(lhs) || isnan(rhs))
     {
-        return std::partial_ordering::equivalent;
+        return std::partial_ordering::unordered;
     }
-
-    return std::partial_ordering::unordered;
+    #endif
+    return std::partial_ordering::equivalent;
 }
 
 template <typename Integer>
@@ -1682,10 +1727,44 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator+(const decimal128_t& lhs, const decim
         {
             return from_bits(detail::d128_nan_mask);
         }
-        
+
         return detail::check_non_finite(lhs, rhs);
     }
     #endif
+
+    // Two fast paths (see decimal64_t.hpp:operator+ for full explanation).
+    // Both gated on non-zero operands so zero short-circuit logic is preserved
+    // by falling through to d128_add_impl_new.
+    {
+        const auto lhs_sig {lhs.full_significand()};
+        const auto rhs_sig {rhs.full_significand()};
+        if (BOOST_DECIMAL_LIKELY(lhs_sig != 0U && rhs_sig != 0U))
+        {
+            const auto lhs_exp {lhs.biased_exponent()};
+            const auto rhs_exp {rhs.biased_exponent()};
+            const auto exp_diff {lhs_exp > rhs_exp ? lhs_exp - rhs_exp : rhs_exp - lhs_exp};
+            if (exp_diff > 75 || exp_diff <= 3)
+            {
+                auto round {_boost_decimal_global_rounding_mode};
+                #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
+                if (!BOOST_DECIMAL_IS_CONSTANT_EVALUATED(lhs))
+                {
+                    round = _boost_decimal_global_runtime_rounding_mode;
+                }
+                #endif
+                if (BOOST_DECIMAL_LIKELY(round == rounding_mode::fe_dec_to_nearest))
+                {
+                    if (exp_diff > 75)
+                    {
+                        return lhs_exp > rhs_exp ? lhs : rhs;
+                    }
+                    return detail::aligned_add_kernel<decimal128_t, int128::uint128_t>(
+                        lhs_sig, rhs_sig, lhs_exp, rhs_exp, static_cast<unsigned>(exp_diff),
+                        lhs.isneg(), rhs.isneg());
+                }
+            }
+        }
+    }
 
     auto lhs_components {lhs.to_components()};
     detail::expand_significand<decimal128_t>(lhs_components.sig, lhs_components.exp);
@@ -1741,10 +1820,44 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator-(const decimal128_t& lhs, const decim
         {
             return -rhs;
         }
-        
+
         return detail::check_non_finite(lhs, rhs);
     }
     #endif
+
+    // Two fast paths; see operator+ above. Both gated on non-zero operands so
+    // zero short-circuit logic is preserved by falling through. For operator-,
+    // rhs sign is flipped before kernel dispatch.
+    {
+        const auto lhs_sig {lhs.full_significand()};
+        const auto rhs_sig {rhs.full_significand()};
+        if (BOOST_DECIMAL_LIKELY(lhs_sig != 0U && rhs_sig != 0U))
+        {
+            const auto lhs_exp {lhs.biased_exponent()};
+            const auto rhs_exp {rhs.biased_exponent()};
+            const auto exp_diff {lhs_exp > rhs_exp ? lhs_exp - rhs_exp : rhs_exp - lhs_exp};
+            if (exp_diff > 75 || exp_diff <= 3)
+            {
+                auto round {_boost_decimal_global_rounding_mode};
+                #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
+                if (!BOOST_DECIMAL_IS_CONSTANT_EVALUATED(lhs))
+                {
+                    round = _boost_decimal_global_runtime_rounding_mode;
+                }
+                #endif
+                if (BOOST_DECIMAL_LIKELY(round == rounding_mode::fe_dec_to_nearest))
+                {
+                    if (exp_diff > 75)
+                    {
+                        return lhs_exp > rhs_exp ? lhs : -rhs;
+                    }
+                    return detail::aligned_add_kernel<decimal128_t, int128::uint128_t>(
+                        lhs_sig, rhs_sig, lhs_exp, rhs_exp, static_cast<unsigned>(exp_diff),
+                        lhs.isneg(), !rhs.isneg());
+                }
+            }
+        }
+    }
 
     auto lhs_components {lhs.to_components()};
     detail::expand_significand<decimal128_t>(lhs_components.sig, lhs_components.exp);
@@ -1861,14 +1974,11 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator*(const decimal128_t lhs, const Intege
 
     auto lhs_sig {lhs.full_significand()};
     auto lhs_exp {lhs.biased_exponent()};
-    const auto lhs_zeros {detail::remove_trailing_zeros(lhs_sig)};
-    lhs_sig = lhs_zeros.trimmed_number;
-    lhs_exp += static_cast<std::int32_t>(lhs_zeros.number_of_removed_zeros);
+    detail::expand_significand<decimal128_t>(lhs_sig, lhs_exp);
 
     auto rhs_sig {static_cast<int128::uint128_t>(detail::make_positive_unsigned(rhs))};
-    const auto rhs_zeros {detail::remove_trailing_zeros(rhs_sig)};
-    rhs_sig = rhs_zeros.trimmed_number;
-    const auto rhs_exp = static_cast<exp_type>(rhs_zeros.number_of_removed_zeros);
+    exp_type rhs_exp {0};
+    detail::normalize<decimal128_t>(rhs_sig, rhs_exp);
 
     return detail::d128_mul_impl<decimal128_t>(
             lhs_sig, lhs_exp, lhs.isneg(),

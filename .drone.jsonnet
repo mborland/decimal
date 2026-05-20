@@ -435,8 +435,14 @@ local windows_pipeline(name, image, environment, arch = "amd64") =
     ),
 
     windows_pipeline(
-        "Windows VS2026 msvc-14.5",
+        "Windows VS2026 msvc-14.5 64-bit",
         "cppalliance/dronevs2026:1",
-        { TOOLSET: 'msvc-14.5', CXXSTD: '14,17,20,latest', ADDRMD: '32,64' },
+        { TOOLSET: 'msvc-14.5', CXXSTD: '14,17,20,latest', ADDRMD: '64' },
     ),
+
+    windows_pipeline(
+            "Windows VS2026 msvc-14.5 32-bit",
+            "cppalliance/dronevs2026:1",
+            { TOOLSET: 'msvc-14.5', CXXSTD: '14,17,20,latest', ADDRMD: '32' },
+        ),
 ]

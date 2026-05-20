@@ -77,7 +77,7 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto equality_impl(Decim
 
     const auto delta_exp {lhs_exp - rhs_exp};
 
-    if (delta_exp > detail::precision_v<DecimalType> || delta_exp < -detail::precision_v<DecimalType>)
+    if (BOOST_DECIMAL_UNLIKELY(delta_exp > detail::precision_v<DecimalType> || delta_exp < -detail::precision_v<DecimalType>))
     {
         return false;
     }
@@ -206,7 +206,7 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto equal_parts_impl(T1 lhs_sig, U1 lhs_exp, bool 
 
     // Check the value of delta exp to avoid to large a value for pow10
     // Also if only one of the significands is 0 then we know the values have to be mismatched
-    if (delta_exp > detail::precision_v<DecimalType> || delta_exp < -detail::precision_v<DecimalType>)
+    if (BOOST_DECIMAL_UNLIKELY(delta_exp > detail::precision_v<DecimalType> || delta_exp < -detail::precision_v<DecimalType>))
     {
         return false;
     }
@@ -462,64 +462,60 @@ BOOST_DECIMAL_FORCE_INLINE constexpr auto fast_type_less_parts_impl(T lhs_sig, U
 }
 
 template <BOOST_DECIMAL_DECIMAL_FLOATING_TYPE DecimalType>
-BOOST_DECIMAL_CUDA_CONSTEXPR auto sequential_less_impl(DecimalType lhs, DecimalType rhs) noexcept -> bool
+BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto sequential_less_impl(DecimalType lhs, DecimalType rhs) noexcept -> bool
 {
     using comp_type = std::conditional_t<detail::decimal_val_v<DecimalType> < 64, std::uint_fast64_t, int128::uint128_t>;
 
-    // Step 1: Handle our non-finite values in their own calling functions
-
-    // Step 2: Check if they are bitwise equal:
-    /*
+    // Non-finite handling is performed by the callers. With NaN ruled out,
+    // identical bit patterns encode the same finite value, so lhs < rhs is false.
     if (lhs.bits_ == rhs.bits_)
     {
         return false;
     }
-    */
 
-    // Step 3: Decode and compare signs first:
-    const auto lhs_sign {lhs.isneg()};
-    const auto rhs_sign {rhs.isneg()};
+    // One combination-field branch per operand instead of three.
+    const auto lhs_components {lhs.to_components()};
+    const auto rhs_components {rhs.to_components()};
+
+    const auto lhs_sign {lhs_components.sign};
+    const auto rhs_sign {rhs_components.sign};
+
+    auto lhs_sig {static_cast<comp_type>(lhs_components.sig)};
+    auto rhs_sig {static_cast<comp_type>(rhs_components.sig)};
+
+    // Signed zeros: +0 == -0, neither is less.
+    if (lhs_sig == static_cast<comp_type>(0) || rhs_sig == static_cast<comp_type>(0))
+    {
+        if (lhs_sig == rhs_sig)
+        {
+            return false;
+        }
+        return lhs_sig == static_cast<comp_type>(0) ? !rhs_sign : lhs_sign;
+    }
 
     if (lhs_sign != rhs_sign)
     {
         return lhs_sign;
     }
 
-    // Step 4: Decode the significand and do a trivial comp
-    auto lhs_sig {static_cast<comp_type>(lhs.full_significand())};
-    auto rhs_sig {static_cast<comp_type>(rhs.full_significand())};
-    if (lhs_sig == static_cast<comp_type>(0) || rhs_sig == static_cast<comp_type>(0))
-    {
-        return (lhs_sig == rhs_sig) ? false : (lhs_sig == static_cast<comp_type>(0) ? !rhs_sign : lhs_sign);
-    }
-
-    // Step 5: Decode the exponent and see if we can even compare the significands
-    auto lhs_exp {lhs.biased_exponent()};
-    auto rhs_exp {rhs.biased_exponent()};
-
+    const auto lhs_exp {lhs_components.exp};
+    const auto rhs_exp {rhs_components.exp};
     const auto delta_exp {lhs_exp - rhs_exp};
+
     constexpr auto max_delta_diff {std::numeric_limits<comp_type>::digits10 - detail::precision_v<DecimalType>};
 
-    if (delta_exp > max_delta_diff || delta_exp < -max_delta_diff)
-    {
-        return rhs_sign ? rhs_exp < lhs_exp : rhs_exp > lhs_exp;
-    }
-
-    // Step 6: Approximate normalization if we need to and then get the answer
-    if (delta_exp >= 0)
-    {
-        lhs_sig *= detail::pow10(static_cast<comp_type>(delta_exp));
-        lhs_exp -= delta_exp;
-    }
-    else
-    {
-        rhs_sig *= detail::pow10(static_cast<comp_type>(-delta_exp));
-        rhs_exp += delta_exp;
-    }
-
-    if (lhs_exp != rhs_exp)
+    if (BOOST_DECIMAL_UNLIKELY(delta_exp > max_delta_diff || delta_exp < -max_delta_diff))
     {
         return lhs_sign ? lhs_exp > rhs_exp : lhs_exp < rhs_exp;
+    }
+
+    if (delta_exp > 0)
+    {
+        lhs_sig *= detail::pow10(static_cast<comp_type>(delta_exp));
+    }
+    else if (delta_exp < 0)
+    {
+        rhs_sig *= detail::pow10(static_cast<comp_type>(-delta_exp));
     }
 
     return lhs_sign ? lhs_sig > rhs_sig : lhs_sig < rhs_sig;

@@ -750,9 +750,14 @@ BOOST_DECIMAL_CUDA_CONSTEXPR decimal32_t::decimal32_t(T1 coeff, T2 exp, const de
         }
         else if (digit_delta > 0 && coeff_digits + digit_delta <= detail::precision)
         {
+            // After the shift, coeff has coeff_digits+digit_delta <= precision digits
+            // (so coeff <= max_significand_v) and biased_exp lands in [0, max] because
+            // we just subtracted exactly the overflow delta from exp. pack_in_range
+            // hits direct_pack on this in-range case; the fallback constructor is a
+            // safety belt if the analysis is wrong (same as the original recursion).
             exp -= digit_delta;
             reduced_coeff *= detail::pow10(static_cast<significand_type>(digit_delta));
-            *this = decimal32_t(reduced_coeff, exp, is_negative);
+            *this = detail::pack_in_range<decimal32_t>(reduced_coeff, exp, is_negative);
         }
         else if (coeff_digits + biased_exp <= detail::precision)
         {
@@ -786,11 +791,14 @@ BOOST_DECIMAL_CUDA_CONSTEXPR decimal32_t::decimal32_t(T1 coeff, T2 exp, const de
         }
         else if (digit_delta < 0 && coeff_digits - digit_delta <= detail::precision)
         {
-            // We can expand the coefficient to use the maximum number of digits
+            // We can expand the coefficient to use the maximum number of digits.
+            // After expansion, coeff has precision digits (<= max_significand_v) and
+            // biased_exp lands in [0, max] (we shift toward the valid range). Same
+            // pack_in_range pattern as the digit_delta > 0 branch above.
             const auto offset {detail::precision - coeff_digits};
             exp -= offset;
             reduced_coeff *= detail::pow10(static_cast<significand_type>(offset));
-            *this = decimal32_t(reduced_coeff, exp, is_negative);
+            *this = detail::pack_in_range<decimal32_t>(reduced_coeff, exp, is_negative);
         }
         else
         {
@@ -826,6 +834,55 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto from_bits(const std::uint32_t bits) noexcept -
     return result;
 }
 
+namespace detail {
+
+// IEEE-pack a known-in-range (coeff, exp, sign) triple into a decimal32_t,
+// skipping the constructor's bounds check + dead-branch handling. Caller
+// guarantees coeff <= d32_max_significand_value and (exp + bias) is in
+// [0, d32_max_biased_exponent].
+template <typename T1, typename T2>
+BOOST_DECIMAL_CUDA_CONSTEXPR auto direct_pack_d32(T1 coeff, T2 exp, bool sign) noexcept -> decimal32_t
+{
+    const auto reduced_coeff {static_cast<std::uint32_t>(coeff)};
+    const auto biased_exp {static_cast<std::uint32_t>(static_cast<int>(exp) + bias_v<decimal32_t>)};
+    std::uint32_t bits {sign ? d32_sign_mask : UINT32_C(0)};
+
+    // The non-combination encoding holds coefficients up to d32_biggest_no_combination_significand,
+    // which covers ~95%+ of post-arithmetic coefficients. The combination-field branch is cold.
+    if (BOOST_DECIMAL_LIKELY(reduced_coeff <= d32_biggest_no_combination_significand))
+    {
+        bits |= (reduced_coeff & d32_not_11_significand_mask);
+        bits |= (biased_exp << d32_not_11_exp_shift) & d32_not_11_exp_mask;
+    }
+    else
+    {
+        bits |= (d32_comb_11_mask | (reduced_coeff & d32_11_significand_mask));
+        bits |= (biased_exp << d32_11_exp_shift) & d32_11_exp_mask;
+    }
+    return from_bits(bits);
+}
+
+// Definition of the pack_in_range<decimal32_t> overload declared in
+// add_impl.hpp. Lives here because the body's `decimal32_t{coeff, exp, sign}`
+// fallback constructor call requires decimal32_t to be a complete type --
+// both C++14 (regular if) and nvcc (eager template body parse for device
+// codegen) would otherwise reject the constructor call when the function
+// was defined at the add_impl.hpp include site (where decimal32_t is still
+// forward-declared via fwd.hpp).
+template <typename ReturnType, typename SigType, typename ExpType>
+BOOST_DECIMAL_CUDA_CONSTEXPR auto pack_in_range(SigType coeff, ExpType exp, bool sign) noexcept
+    -> std::enable_if_t<std::is_same<ReturnType, decimal32_t>::value, decimal32_t>
+{
+    const auto biased_exp_check {static_cast<int>(exp) + bias_v<decimal32_t>};
+    if (BOOST_DECIMAL_LIKELY(biased_exp_check >= 0
+        && biased_exp_check <= static_cast<int>(max_biased_exp_v<decimal32_t>)))
+    {
+        return direct_pack_d32(static_cast<std::uint32_t>(coeff), exp, sign);
+    }
+    return decimal32_t{coeff, exp, sign};
+}
+
+} // namespace detail (close to make the existing detail namespace block work)
 namespace detail {
 
 template <bool>
@@ -1025,6 +1082,41 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator+(const decimal32_t lhs, const decimal
     }
     #endif
 
+    // Two fast paths (see decimal64_t.hpp:operator+ for full explanation).
+    // Both gated on non-zero operands so zero short-circuit logic is preserved
+    // by falling through to add_impl.
+    {
+        const auto lhs_sig {lhs.full_significand()};
+        const auto rhs_sig {rhs.full_significand()};
+        if (BOOST_DECIMAL_LIKELY(lhs_sig != 0U && rhs_sig != 0U))
+        {
+            const auto lhs_exp {lhs.biased_exponent()};
+            const auto rhs_exp {rhs.biased_exponent()};
+            const auto exp_diff {lhs_exp > rhs_exp ? lhs_exp - rhs_exp : rhs_exp - lhs_exp};
+            if (exp_diff > 17 || exp_diff <= 3)
+            {
+                auto round {_boost_decimal_global_rounding_mode};
+                #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
+                if (!BOOST_DECIMAL_IS_CONSTANT_EVALUATED(lhs))
+                {
+                    round = _boost_decimal_global_runtime_rounding_mode;
+                }
+                #endif
+                if (BOOST_DECIMAL_LIKELY(round == rounding_mode::fe_dec_to_nearest))
+                {
+                    if (exp_diff > 17)
+                    {
+                        return lhs_exp > rhs_exp ? lhs : rhs;
+                    }
+                    return detail::aligned_add_kernel<decimal32_t, std::uint64_t>(
+                        static_cast<std::uint64_t>(lhs_sig), static_cast<std::uint64_t>(rhs_sig),
+                        lhs_exp, rhs_exp, static_cast<unsigned>(exp_diff),
+                        lhs.isneg(), rhs.isneg());
+                }
+            }
+        }
+    }
+
     auto lhs_components {lhs.to_components()};
     detail::expand_significand<decimal32_t>(lhs_components.sig, lhs_components.exp);
     auto rhs_components {rhs.to_components()};
@@ -1129,6 +1221,41 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator-(const decimal32_t lhs, const decimal
         return detail::check_non_finite(lhs, rhs);
     }
     #endif
+
+    // Two fast paths; see operator+ above. Both gated on non-zero operands so
+    // zero short-circuit logic is preserved by falling through. For operator-,
+    // rhs sign is flipped before kernel dispatch.
+    {
+        const auto lhs_sig {lhs.full_significand()};
+        const auto rhs_sig {rhs.full_significand()};
+        if (BOOST_DECIMAL_LIKELY(lhs_sig != 0U && rhs_sig != 0U))
+        {
+            const auto lhs_exp {lhs.biased_exponent()};
+            const auto rhs_exp {rhs.biased_exponent()};
+            const auto exp_diff {lhs_exp > rhs_exp ? lhs_exp - rhs_exp : rhs_exp - lhs_exp};
+            if (exp_diff > 17 || exp_diff <= 3)
+            {
+                auto round {_boost_decimal_global_rounding_mode};
+                #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
+                if (!BOOST_DECIMAL_IS_CONSTANT_EVALUATED(lhs))
+                {
+                    round = _boost_decimal_global_runtime_rounding_mode;
+                }
+                #endif
+                if (BOOST_DECIMAL_LIKELY(round == rounding_mode::fe_dec_to_nearest))
+                {
+                    if (exp_diff > 17)
+                    {
+                        return lhs_exp > rhs_exp ? lhs : -rhs;
+                    }
+                    return detail::aligned_add_kernel<decimal32_t, std::uint64_t>(
+                        static_cast<std::uint64_t>(lhs_sig), static_cast<std::uint64_t>(rhs_sig),
+                        lhs_exp, rhs_exp, static_cast<unsigned>(exp_diff),
+                        lhs.isneg(), !rhs.isneg());
+                }
+            }
+        }
+    }
 
     auto lhs_components {lhs.to_components()};
     detail::expand_significand<decimal32_t>(lhs_components.sig, lhs_components.exp);
@@ -1485,16 +1612,17 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator<=>(const decimal32_t lhs, const decim
     {
         return std::partial_ordering::less;
     }
-    else if (lhs > rhs)
+    if (rhs < lhs)
     {
         return std::partial_ordering::greater;
     }
-    else if (lhs == rhs)
+    #ifndef BOOST_DECIMAL_FAST_MATH
+    if (isnan(lhs) || isnan(rhs))
     {
-        return std::partial_ordering::equivalent;
+        return std::partial_ordering::unordered;
     }
-
-    return std::partial_ordering::unordered;
+    #endif
+    return std::partial_ordering::equivalent;
 }
 
 template <typename Integer>
