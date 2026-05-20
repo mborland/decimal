@@ -522,20 +522,22 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto d128_add_impl_new(const T& lhs, const T& rhs) 
     // Phase 1 same-exp fast path: stays in uint128 (no u256 promotion, no u256 trailing add).
     // Default rounding only; non-default rounding falls through to the existing u256 path.
     BOOST_DECIMAL_IF_CONSTEXPR (fast_path_eligible)
-    if (lhs_exp == rhs_exp)
     {
-        bool default_rounding {_boost_decimal_global_rounding_mode == rounding_mode::fe_dec_to_nearest};
-        #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
-        if (!BOOST_DECIMAL_IS_CONSTANT_EVALUATED(lhs))
+        if (lhs_exp == rhs_exp)
         {
-            default_rounding = (_boost_decimal_global_runtime_rounding_mode == rounding_mode::fe_dec_to_nearest);
-        }
-        #endif
-        if (BOOST_DECIMAL_LIKELY(default_rounding))
-        {
-            return d128_uint128_aligned_kernel<ReturnType>(
-                big_lhs, big_rhs, lhs_exp, rhs_exp, 0U,
-                lhs.isneg(), rhs.isneg());
+            bool default_rounding {_boost_decimal_global_rounding_mode == rounding_mode::fe_dec_to_nearest};
+            #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
+            if (!BOOST_DECIMAL_IS_CONSTANT_EVALUATED(lhs))
+            {
+                default_rounding = (_boost_decimal_global_runtime_rounding_mode == rounding_mode::fe_dec_to_nearest);
+            }
+            #endif
+            if (BOOST_DECIMAL_LIKELY(default_rounding))
+            {
+                return d128_uint128_aligned_kernel<ReturnType>(
+                    big_lhs, big_rhs, lhs_exp, rhs_exp, 0U,
+                    lhs.isneg(), rhs.isneg());
+            }
         }
     }
 
@@ -551,22 +553,24 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto d128_add_impl_new(const T& lhs, const T& rhs) 
         // under default rounding; the u256 slow path covers other modes.
         // No LIKELY hint: random-exp workloads have shift >> 3, accumulation has
         // shift <= 3, so neither prediction wins universally.
-        constexpr unsigned u128_small_diff_limit {3U};
         BOOST_DECIMAL_IF_CONSTEXPR (fast_path_eligible)
-        if (shift <= u128_small_diff_limit)
         {
-            bool default_rounding {_boost_decimal_global_rounding_mode == rounding_mode::fe_dec_to_nearest};
-            #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
-            if (!BOOST_DECIMAL_IS_CONSTANT_EVALUATED(lhs))
+            constexpr auto u128_small_diff_limit {3U};
+            if (shift <= u128_small_diff_limit)
             {
-                default_rounding = (_boost_decimal_global_runtime_rounding_mode == rounding_mode::fe_dec_to_nearest);
-            }
-            #endif
-            if (BOOST_DECIMAL_LIKELY(default_rounding))
-            {
-                return d128_uint128_aligned_kernel<ReturnType>(
-                    big_lhs, big_rhs, lhs_exp, rhs_exp, static_cast<unsigned>(shift),
-                    lhs.isneg(), rhs.isneg());
+                bool default_rounding {_boost_decimal_global_rounding_mode == rounding_mode::fe_dec_to_nearest};
+                #ifndef BOOST_DECIMAL_NO_CONSTEVAL_DETECTION
+                if (!BOOST_DECIMAL_IS_CONSTANT_EVALUATED(lhs))
+                {
+                    default_rounding = (_boost_decimal_global_runtime_rounding_mode == rounding_mode::fe_dec_to_nearest);
+                }
+                #endif
+                if (BOOST_DECIMAL_LIKELY(default_rounding))
+                {
+                    return d128_uint128_aligned_kernel<ReturnType>(
+                        big_lhs, big_rhs, lhs_exp, rhs_exp, static_cast<unsigned>(shift),
+                        lhs.isneg(), rhs.isneg());
+                }
             }
         }
 
