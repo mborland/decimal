@@ -102,7 +102,7 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_finalize_u128(
         }
     }
 
-    return detail::pack_in_range<ReturnType>(static_cast<std::uint64_t>(q.low),
+    return detail::pack_in_range<ReturnType>(q.low,
                                              result_exp + static_cast<ExpType>(extra),
                                              result_sign);
 }
