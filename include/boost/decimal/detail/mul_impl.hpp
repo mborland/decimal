@@ -306,9 +306,14 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_impl(const T& l
         std::integral_constant<bool, detail::is_decimal_floating_point_v<ReturnType>>{});
 }
 
+#ifdef _MSC_VER
+#  pragma warning(push)
+#  pragma warning(disable : 4702) // Complains that unlikely branches are unreachable
+#endif
+
 template <typename ReturnType, typename T, typename U>
-BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_impl(T lhs_sig, U lhs_exp, bool lhs_sign,
-                                                   T rhs_sig, U rhs_exp, bool rhs_sign) noexcept -> ReturnType
+BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_impl(T lhs_sig, U lhs_exp, const bool lhs_sign,
+                                                   T rhs_sig, U rhs_exp, const bool rhs_sign) noexcept -> ReturnType
 {
     // d32 * Integer (sole caller) always passes an IEEE/fast decimal ReturnType.
     // The body references mul_finalize_u64<ReturnType> and expand_significand,
@@ -348,6 +353,10 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto mul_impl(T lhs_sig,
 
     return impl::mul_finalize_u64<ReturnType>(res_sig, res_exp, sign);
 }
+
+#ifdef _MSC_VER
+#  pragma warning(pop)
+#endif
 
 // d64 specialization. Used by `decimal_fast64_t * decimal_fast64_t` (which
 // passes decimal types directly without to_components conversion) and by the
