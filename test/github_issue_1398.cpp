@@ -8,24 +8,29 @@
 #include <boost/core/lightweight_test.hpp>
 #include <limits>
 
-template <typename T>
-void test()
+template <typename T, typename U>
+void test_driver()
 {
     using namespace boost::decimal;
 
     constexpr auto builtin_neg_inf = -std::numeric_limits<T>::infinity();
 
-    const auto d32 = decimal32_t(builtin_neg_inf);
-    BOOST_TEST(isinf(d32));
-    BOOST_TEST(d32 < 0);
+    const auto val = U(builtin_neg_inf);
+    BOOST_TEST(isinf(val));
+    BOOST_TEST(val < 0);
+}
 
-    const auto d64 = decimal64_t(builtin_neg_inf);
-    BOOST_TEST(isinf(d64));
-    BOOST_TEST(d64 < 0);
+template <typename T>
+void test()
+{
+    using namespace boost::decimal;
 
-    const auto d128 = decimal128_t(builtin_neg_inf);
-    BOOST_TEST(isinf(d128));
-    BOOST_TEST(d128 < 0);
+    test_driver<T, decimal32_t>();
+    test_driver<T, decimal64_t>();
+    test_driver<T, decimal128_t>();
+    test_driver<T, decimal_fast32_t>();
+    test_driver<T, decimal_fast64_t>();
+    test_driver<T, decimal_fast128_t>();
 }
 
 int main()
