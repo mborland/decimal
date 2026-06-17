@@ -1052,9 +1052,13 @@ BOOST_DECIMAL_CXX20_CONSTEXPR decimal128_t::decimal128_t(const Float val) noexce
     {
         *this = from_bits(detail::d128_nan_mask);
     }
-    else if (val == std::numeric_limits<Float>::infinity() || val == -std::numeric_limits<Float>::infinity())
+    else if (val == std::numeric_limits<Float>::infinity())
     {
         *this = from_bits(detail::d128_inf_mask);
+    }
+    else if (val == -std::numeric_limits<Float>::infinity())
+    {
+        *this = -from_bits(detail::d128_inf_mask);
     }
     else
     #endif

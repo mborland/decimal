@@ -724,9 +724,14 @@ BOOST_DECIMAL_CXX20_CONSTEXPR decimal_fast32_t::decimal_fast32_t(const Float val
     {
         significand_ = detail::d32_fast_qnan;
     }
-    else if (val == std::numeric_limits<Float>::infinity() || val == -std::numeric_limits<Float>::infinity())
+    else if (val == std::numeric_limits<Float>::infinity())
     {
         significand_ = detail::d32_fast_inf;
+    }
+    else if (val == -std::numeric_limits<Float>::infinity())
+    {
+        significand_ = detail::d32_fast_inf;
+        sign_ = true;
     }
     else
     #endif

@@ -1801,9 +1801,13 @@ BOOST_DECIMAL_CXX20_CONSTEXPR decimal32_t::decimal32_t(const Float val) noexcept
     {
         *this = boost::decimal::from_bits(boost::decimal::detail::d32_nan_mask);
     }
-    else if (val == std::numeric_limits<Float>::infinity() || val == -std::numeric_limits<Float>::infinity())
+    else if (val == std::numeric_limits<Float>::infinity())
     {
         *this = boost::decimal::from_bits(boost::decimal::detail::d32_inf_mask);
+    }
+    else if (val == -std::numeric_limits<Float>::infinity())
+    {
+        *this = -boost::decimal::from_bits(boost::decimal::detail::d32_inf_mask);
     }
     else
     #endif
