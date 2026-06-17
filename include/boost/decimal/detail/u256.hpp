@@ -1135,7 +1135,7 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR u256 default_div(const u
 // path) or when the dividend's top 128 bits are not strictly less than the
 // normalized divisor (the 3/2 algorithm's precondition for a single-limb
 // quotient).
-BOOST_DECIMAL_FORCE_INLINE bool mg32_u256_by_u128(
+constexpr BOOST_DECIMAL_FORCE_INLINE bool mg32_u256_by_u128(
     u256 u, int128::uint128_t d,
     int128::uint128_t& q, int128::uint128_t& r) noexcept
 {
