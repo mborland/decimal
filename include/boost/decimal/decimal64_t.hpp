@@ -1006,9 +1006,13 @@ BOOST_DECIMAL_CXX20_CONSTEXPR decimal64_t::decimal64_t(const Float val) noexcept
     {
         *this = from_bits(detail::d64_nan_mask);
     }
-    else if (val == std::numeric_limits<Float>::infinity() || val == -std::numeric_limits<Float>::infinity())
+    else if (val == std::numeric_limits<Float>::infinity())
     {
         *this = from_bits(detail::d64_inf_mask);
+    }
+    else if (val == -std::numeric_limits<Float>::infinity())
+    {
+        *this = -from_bits(detail::d64_inf_mask);
     }
     else
     #endif
