@@ -1135,7 +1135,7 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR u256 default_div(const u
 // path) or when the dividend's top 128 bits are not strictly less than the
 // normalized divisor (the 3/2 algorithm's precondition for a single-limb
 // quotient).
-constexpr BOOST_DECIMAL_FORCE_INLINE bool mg32_u256_by_u128(
+BOOST_DECIMAL_FORCE_INLINE bool mg32_u256_by_u128(
     u256 u, int128::uint128_t d,
     int128::uint128_t& q, int128::uint128_t& r) noexcept
 {
@@ -1188,6 +1188,22 @@ constexpr BOOST_DECIMAL_FORCE_INLINE bool mg32_u256_by_u128(
 
 #endif // BOOST_DECIMAL_DETAIL_INT128_HAS_FAST_DIV128
 
+// True when the divisor fits in 128 bits, i.e. the MG u256-by-u128 fast path
+// is applicable. A u256 divisor only qualifies when its upper 128 bits are
+// clear; static_cast<uint128_t> would otherwise truncate it silently and the
+// fast path would divide by the wrong value. Narrower integer types always
+// qualify.
+BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR bool divisor_fits_u128(const u256& rhs) noexcept
+{
+    return rhs.bytes[2] == UINT64_C(0) && rhs.bytes[3] == UINT64_C(0);
+}
+
+template <typename UnsignedInteger>
+BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR bool divisor_fits_u128(const UnsignedInteger&) noexcept
+{
+    return true;
+}
+
 template <typename UnsignedInteger>
 BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR u256 default_div(const u256& lhs, const UnsignedInteger& rhs) noexcept
 {
@@ -1200,11 +1216,15 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR u256 default_div(const u
         return u256{};
     }
 
-    #ifdef BOOST_DECIMAL_DETAIL_INT128_HAS_FAST_DIV128
+    #if defined(BOOST_DECIMAL_DETAIL_INT128_HAS_FAST_DIV128) && !defined(BOOST_DECIMAL_DETAIL_INT128_NO_CONSTEVAL_DETECTION)
     // MG 3/2 fast path. Replaces ~3 hardware divides in the 32-bit Knuth-D
     // outer loop with one reciprocal-compute plus two cheap 3/2 inner steps.
     // Bails out (returns false) for inputs that don't fit the algorithm's
     // single-limb-quotient shape; those fall through to Knuth-D below.
+    // Runtime-only: the MG helpers call hardware intrinsics that are not
+    // usable in a constant expression, so this path is gated behind
+    // IS_CONSTANT_EVALUATED (and compiled out when detection is unavailable).
+    if (!BOOST_DECIMAL_DETAIL_INT128_IS_CONSTANT_EVALUATED(lhs) && divisor_fits_u128(rhs))
     {
         const int128::uint128_t rhs_u128 {static_cast<int128::uint128_t>(rhs)};
         int128::uint128_t mg_q{};
@@ -1242,10 +1262,13 @@ struct u256_divmod_result
 template <typename UnsignedInteger>
 BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto div_mod(const u256& lhs, const UnsignedInteger& rhs) noexcept -> u256_divmod_result
 {
-    #ifdef BOOST_DECIMAL_DETAIL_INT128_HAS_FAST_DIV128
+    #if defined(BOOST_DECIMAL_DETAIL_INT128_HAS_FAST_DIV128) && !defined(BOOST_DECIMAL_DETAIL_INT128_NO_CONSTEVAL_DETECTION)
     // MG 3/2 fast path for u256/uint128. See default_div for rationale.
     // Single-limb divisors fall through to the 32-bit Knuth-D path below,
     // which has a dedicated n==1 short-circuit.
+    // Runtime-only: gated behind IS_CONSTANT_EVALUATED because the MG helpers
+    // call hardware intrinsics that are not usable in a constant expression.
+    if (!BOOST_DECIMAL_DETAIL_INT128_IS_CONSTANT_EVALUATED(lhs) && divisor_fits_u128(rhs))
     {
         const int128::uint128_t rhs_u128 {static_cast<int128::uint128_t>(rhs)};
         if (rhs_u128.high != 0U)

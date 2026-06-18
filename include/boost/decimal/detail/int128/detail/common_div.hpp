@@ -603,7 +603,7 @@ BOOST_DECIMAL_DETAIL_INT128_FORCE_INLINE std::uint64_t mg32_div_3by2(
 // Precondition: d.high has its MSB set (d >= 2^127).
 // Reference: Moller & Granlund 2010, Algorithm 2.
 template <typename U128>
-constexpr BOOST_DECIMAL_DETAIL_INT128_FORCE_INLINE std::uint64_t mg32_reciprocal_2by1(U128 d) noexcept
+BOOST_DECIMAL_DETAIL_INT128_FORCE_INLINE std::uint64_t mg32_reciprocal_2by1(U128 d) noexcept
 {
     // v_1 = floor((2^128 - 1) / d.high) - 2^64, computed via one 128/64 divide.
     // The trick: divq(UINT64_MAX - d.high, UINT64_MAX, d.high) sidesteps the
