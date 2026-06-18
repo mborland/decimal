@@ -1,0 +1,131 @@
+# ------------------------------------------------------------------------------
+#  Copyright Matt Borland 2026.
+#  Distributed under the Boost Software License,
+#  Version 1.0. (See accompanying file LICENSE_1_0.txt
+#  or copy at http://www.boost.org/LICENSE_1_0.txt)
+# ------------------------------------------------------------------------------
+#
+# Runs the Boost.Decimal benchmarks (test/benchmarks.cpp) in release mode on a
+# spread of native runners so that performance numbers, and any regressions in
+# them, are captured on every run. The benchmark target is a run-fail test that
+# always returns non-zero, so b2 reports success and the timing output is read
+# back from the captured .output file.
+
+name: Run Benchmarks
+
+on:
+  push:
+    branches:
+      - master
+      - develop
+      - feature/**
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ format('{0}:{1}:benchmarks', github.repository, github.ref) }}
+  cancel-in-progress: true
+
+env:
+  GIT_FETCH_JOBS: 8
+
+jobs:
+  linux:
+    name: Linux GCC ${{ matrix.address_model }}-bit
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        address_model: [ 32, 64 ]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++-14 g++-14-multilib
+      - name: Setup Boost
+        run: |
+          LIBRARY=${GITHUB_REPOSITORY#*/}
+          echo "LIBRARY=$LIBRARY" >> $GITHUB_ENV
+          REF=${GITHUB_BASE_REF:-$GITHUB_REF}
+          REF=${REF#refs/heads/}
+          BOOST_BRANCH=develop && [ "$REF" = "master" ] && BOOST_BRANCH=master || true
+          echo "BOOST_BRANCH: $BOOST_BRANCH"
+          cd ..
+          git clone -b "$BOOST_BRANCH" --depth 1 "https://github.com/boostorg/boost.git" boost-root
+          cd boost-root
+          mkdir -p libs/$LIBRARY
+          cp -r "$GITHUB_WORKSPACE"/* libs/$LIBRARY
+          git submodule update --init tools/boostdep
+          python tools/boostdep/depinst/depinst.py --git_args "--jobs $GIT_FETCH_JOBS" $LIBRARY
+          ./bootstrap.sh
+          ./b2 headers
+          echo "using gcc : : g++-14 ;" > ~/user-config.jam
+      - name: Run benchmarks (release)
+        run: |
+          cd ../boost-root
+          ./b2 -j$(nproc) toolset=gcc cxxstd=20 variant=release address-model=${{ matrix.address_model }} \
+            define=BOOST_DECIMAL_RUN_BENCHMARKS libs/$LIBRARY/test//benchmarks
+          echo "==================== Benchmark results (Linux GCC ${{ matrix.address_model }}-bit) ===================="
+          find bin.v2 -path '*release*' -name 'benchmarks.output' -exec cat {} +
+          find bin.v2 -path '*release*' -name 'benchmarks.output' -exec cp {} "$GITHUB_WORKSPACE/benchmarks-linux-gcc-${{ matrix.address_model }}-bit.txt" \;
+      - name: Upload benchmark output
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: benchmarks-linux-gcc-${{ matrix.address_model }}-bit
+          path: benchmarks-linux-gcc-${{ matrix.address_model }}-bit.txt
+          if-no-files-found: warn
+
+  windows:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Windows x64 MSVC
+            os: windows-latest
+            arch: x64
+          - name: Windows ARM64 MSVC
+            os: windows-11-arm
+            arch: arm64
+    defaults:
+      run:
+        shell: cmd
+    steps:
+      - uses: actions/checkout@v6
+      - name: Setup Boost
+        run: |
+          for /f %%i in ("%GITHUB_REPOSITORY%") do set LIBRARY=%%~nxi
+          echo LIBRARY=%LIBRARY%>>%GITHUB_ENV%
+          if "%GITHUB_BASE_REF%" == "" set GITHUB_BASE_REF=%GITHUB_REF%
+          set BOOST_BRANCH=develop
+          for /f %%i in ("%GITHUB_BASE_REF%") do if "%%~nxi" == "master" set BOOST_BRANCH=master
+          echo BOOST_BRANCH: %BOOST_BRANCH%
+          cd ..
+          git clone -b %BOOST_BRANCH% --depth 1 https://github.com/boostorg/boost.git boost-root
+          cd boost-root
+          xcopy /s /e /q %GITHUB_WORKSPACE% libs\%LIBRARY%\
+          git submodule update --init tools/boostdep
+          python tools/boostdep/depinst/depinst.py --git_args "--jobs 3" %LIBRARY%
+          cmd /c bootstrap
+          b2 -d0 headers
+      - name: Run benchmarks (release)
+        run: |
+          cd ../boost-root
+          b2 -j3 libs/%LIBRARY%/test//benchmarks toolset=msvc cxxstd=latest address-model=64 variant=release define=BOOST_DECIMAL_RUN_BENCHMARKS embed-manifest-via=linker
+          echo ==================== Benchmark results (%RUNNER_OS% %RUNNER_ARCH%) ====================
+          for /r bin.v2 %%f in (benchmarks.output) do @type "%%f"
+          for /r bin.v2 %%f in (benchmarks.output) do @copy /y "%%f" "%GITHUB_WORKSPACE%\benchmarks-windows-${{ matrix.arch }}.txt" >nul
+      - name: Upload benchmark output
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: benchmarks-windows-${{ matrix.arch }}
+          path: benchmarks-windows-${{ matrix.arch }}.txt
+          if-no-files-found: warn
