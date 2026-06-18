@@ -118,10 +118,11 @@ jobs:
       - name: Run benchmarks (release)
         run: |
           cd ../boost-root
-          b2 -j3 libs/%LIBRARY%/test//benchmarks toolset=msvc cxxstd=latest address-model=64 variant=release define=BOOST_DECIMAL_RUN_BENCHMARKS embed-manifest-via=linker
+          b2 -j3 libs/%LIBRARY%/test//benchmarks toolset=msvc cxxstd=latest address-model=64 variant=release define=BOOST_DECIMAL_RUN_BENCHMARKS embed-manifest-via=linker || exit /b 1
           echo ==================== Benchmark results (%RUNNER_OS% %RUNNER_ARCH%) ====================
-          for /r bin.v2 %%f in (benchmarks.output) do @type "%%f"
-          for /r bin.v2 %%f in (benchmarks.output) do @copy /y "%%f" "%GITHUB_WORKSPACE%\benchmarks-windows-${{ matrix.arch }}.txt" >nul
+          for /f "delims=" %%f in ('dir /s /b bin.v2\benchmarks.output 2^>nul') do @type "%%f"
+          for /f "delims=" %%f in ('dir /s /b bin.v2\benchmarks.output 2^>nul') do @copy /y "%%f" "%GITHUB_WORKSPACE%\benchmarks-windows-${{ matrix.arch }}.txt" >nul
+          exit /b 0
       - name: Upload benchmark output
         if: always()
         uses: actions/upload-artifact@v6
