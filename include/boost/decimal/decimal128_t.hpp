@@ -1606,13 +1606,13 @@ std::ostream& operator<<( std::ostream& os, boost::decimal::detail::builtin_uint
 
 BOOST_DECIMAL_CUDA_CONSTEXPR auto d128_div_impl(const decimal128_t& lhs, const decimal128_t& rhs, decimal128_t& q, decimal128_t& r) noexcept -> void
 {
+    const bool sign {lhs.isneg() != rhs.isneg()};
+
     #ifndef BOOST_DECIMAL_FAST_MATH
     // Check pre-conditions
     constexpr decimal128_t zero {0, 0};
     constexpr decimal128_t nan {from_bits(detail::d128_nan_mask)};
     constexpr decimal128_t inf {from_bits(detail::d128_inf_mask)};
-
-    const bool sign {lhs.isneg() != rhs.isneg()};
 
     const auto lhs_fp {fpclassify(lhs)};
     const auto rhs_fp {fpclassify(rhs)};
@@ -1711,11 +1711,7 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto d128_div_impl(const decimal128_t& lhs, const d
               << "\nexp rhs: " << exp_rhs << std::endl;
     #endif
 
-    detail::decimal128_t_components q_components {};
-
-    detail::d128_generic_div_impl(lhs_components, rhs.to_components(), q_components);
-
-    q = decimal128_t(q_components.sig, q_components.exp, q_components.sign);
+    q = detail::d128_generic_div_impl<decimal128_t>(lhs_components, rhs.to_components(), sign);
 }
 
 #ifdef _MSC_VER
@@ -2010,12 +2006,12 @@ template <typename Integer>
 BOOST_DECIMAL_CUDA_CONSTEXPR auto operator/(const decimal128_t lhs, const Integer rhs) noexcept
     BOOST_DECIMAL_REQUIRES_RETURN(detail::is_integral_v, Integer, decimal128_t)
 {
+    const bool sign {lhs.isneg() != (rhs < 0)};
+
     #ifndef BOOST_DECIMAL_FAST_MATH
     // Check pre-conditions
     constexpr decimal128_t zero {0, 0};
     constexpr decimal128_t inf {from_bits(detail::d128_inf_mask)};
-
-    const bool sign {lhs.isneg() != (rhs < 0)};
 
     const auto lhs_fp {fpclassify(lhs)};
 
@@ -2041,23 +2037,20 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator/(const decimal128_t lhs, const Intege
     detail::expand_significand<decimal128_t>(lhs_components.sig, lhs_components.exp);
 
     const detail::decimal128_t_components rhs_components {detail::make_positive_unsigned(rhs), 0, rhs < 0};
-    detail::decimal128_t_components q_components {};
 
-    detail::d128_generic_div_impl(lhs_components, rhs_components, q_components);
-
-    return decimal128_t(q_components.sig, q_components.exp, q_components.sign);
+    return detail::d128_generic_div_impl<decimal128_t>(lhs_components, rhs_components, sign);
 }
 
 template <typename Integer>
 BOOST_DECIMAL_CUDA_CONSTEXPR auto operator/(const Integer lhs, const decimal128_t rhs) noexcept
     BOOST_DECIMAL_REQUIRES_RETURN(detail::is_integral_v, Integer, decimal128_t)
 {
+    const bool sign {(lhs < 0) != rhs.isneg()};
+
     #ifndef BOOST_DECIMAL_FAST_MATH
     // Check pre-conditions
     constexpr decimal128_t zero {0, 0};
     constexpr decimal128_t inf {from_bits(detail::d128_inf_mask)};
-
-    const bool sign {(lhs < 0) != rhs.isneg()};
 
     const auto rhs_fp {fpclassify(rhs)};
 
@@ -2078,11 +2071,8 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto operator/(const Integer lhs, const decimal128_
     detail::expand_significand<decimal128_t>(rhs_components.sig, rhs_components.exp);
 
     const detail::decimal128_t_components lhs_components {detail::make_positive_unsigned(lhs), 0, lhs < 0};
-    detail::decimal128_t_components q_components {};
 
-    detail::d128_generic_div_impl(lhs_components, rhs_components, q_components);
-
-    return decimal128_t(q_components.sig, q_components.exp, q_components.sign);
+    return detail::d128_generic_div_impl<decimal128_t>(lhs_components, rhs_components, sign);
 }
 
 BOOST_DECIMAL_CUDA_CONSTEXPR auto operator%(const decimal128_t& lhs, const decimal128_t& rhs) noexcept -> decimal128_t

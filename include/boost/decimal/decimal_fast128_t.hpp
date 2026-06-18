@@ -1399,20 +1399,7 @@ constexpr auto d128f_div_impl(const decimal_fast128_t& lhs, const decimal_fast12
     static_cast<void>(r);
     #endif
 
-    #ifdef BOOST_DECIMAL_DEBUG
-    std::cerr << "sig lhs: " << sig_lhs
-              << "\nexp lhs: " << exp_lhs
-              << "\nsig rhs: " << sig_rhs
-              << "\nexp rhs: " << exp_rhs << std::endl;
-    #endif
-
-    constexpr auto ten_pow_precision {detail::pow10(int128::uint128_t(detail::precision_v<decimal_fast128_t>))};
-    const auto big_sig_lhs {detail::umul256(lhs.significand_, ten_pow_precision)};
-
-    const auto res_sig {big_sig_lhs / rhs.significand_};
-    const auto res_exp {lhs.biased_exponent() - rhs.biased_exponent() - detail::precision_v<decimal_fast128_t>};
-
-    q = decimal_fast128_t(static_cast<int128::uint128_t>(res_sig), res_exp, sign);
+    q = detail::d128_generic_div_impl<decimal_fast128_t>(lhs.to_components(), rhs.to_components(), sign);
 }
 
 constexpr auto operator/(const decimal_fast128_t& lhs, const decimal_fast128_t& rhs) noexcept -> decimal_fast128_t
@@ -1428,12 +1415,12 @@ template <typename Integer>
 constexpr auto operator/(const decimal_fast128_t& lhs, const Integer rhs) noexcept
     BOOST_DECIMAL_REQUIRES_RETURN(detail::is_integral_v, Integer, decimal_fast128_t)
 {
+    const bool sign {lhs.isneg() != (rhs < 0)};
+
     #ifndef BOOST_DECIMAL_FAST_MATH
     // Check pre-conditions
     constexpr decimal_fast128_t zero {0, 0};
     constexpr decimal_fast128_t inf {direct_init_d128(detail::d128_fast_inf, 0, false)};
-
-    const bool sign {lhs.isneg() != (rhs < 0)};
 
     const auto lhs_fp {fpclassify(lhs)};
 
@@ -1459,23 +1446,20 @@ constexpr auto operator/(const decimal_fast128_t& lhs, const Integer rhs) noexce
 
     const auto rhs_sig {detail::make_positive_unsigned(rhs)};
     const detail::decimal_fast128_t_components rhs_components {rhs_sig, 0, rhs < 0};
-    detail::decimal_fast128_t_components q_components {};
 
-    detail::d128_generic_div_impl(lhs_components, rhs_components, q_components);
-
-    return {q_components.sig, q_components.exp, q_components.sign};
+    return detail::d128_generic_div_impl<decimal_fast128_t>(lhs_components, rhs_components, sign);
 }
 
 template <typename Integer>
 constexpr auto operator/(const Integer lhs, const decimal_fast128_t& rhs) noexcept
     BOOST_DECIMAL_REQUIRES_RETURN(detail::is_integral_v, Integer, decimal_fast128_t)
 {
+    const bool sign {(lhs < 0) != rhs.isneg()};
+
     #ifndef BOOST_DECIMAL_FAST_MATH
     // Check pre-conditions
     constexpr decimal_fast128_t zero {0, 0};
     constexpr decimal_fast128_t inf {direct_init_d128(detail::d128_fast_inf, 0, false)};
-
-    const bool sign {(lhs < 0) != rhs.isneg()};
 
     const auto rhs_fp {fpclassify(rhs)};
 
@@ -1494,11 +1478,8 @@ constexpr auto operator/(const Integer lhs, const decimal_fast128_t& rhs) noexce
 
     const detail::decimal_fast128_t_components lhs_components {detail::make_positive_unsigned(lhs), 0, lhs < 0};
     const detail::decimal_fast128_t_components rhs_components {rhs.significand_, rhs.biased_exponent(), rhs.isneg()};
-    detail::decimal_fast128_t_components q_components {};
 
-    detail::d128_generic_div_impl(lhs_components, rhs_components, q_components);
-
-    return {q_components.sig, q_components.exp, q_components.sign};
+    return detail::d128_generic_div_impl<decimal_fast128_t>(lhs_components, rhs_components, sign);
 }
 
 constexpr auto operator%(const decimal_fast128_t& lhs, const decimal_fast128_t& rhs) noexcept -> decimal_fast128_t

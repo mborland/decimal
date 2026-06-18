@@ -1521,25 +1521,7 @@ constexpr auto d64_fast_div_impl(const decimal_fast64_t& lhs, const decimal_fast
     static_cast<void>(r);
     #endif
 
-    #ifdef BOOST_DECIMAL_DEBUG
-    std::cerr << "sig lhs: " << sig_lhs
-              << "\nexp lhs: " << exp_lhs
-              << "\nsig rhs: " << sig_rhs
-              << "\nexp rhs: " << exp_rhs << std::endl;
-    #endif
-
-    using unsigned_int128_type = boost::int128::uint128_t;
-
-    // If rhs is greater than we need to offset the significands to get the correct values
-    // e.g. 4/8 is 0 but 40/8 yields 5 in integer maths
-    constexpr auto offset {std::numeric_limits<unsigned_int128_type>::digits10 - detail::precision_v<decimal_fast64_t>};
-    constexpr auto tens_needed {detail::pow10(static_cast<unsigned_int128_type>(offset))};
-    const auto big_sig_lhs {static_cast<unsigned_int128_type>(lhs.significand_) * tens_needed};
-
-    const auto res_sig {big_sig_lhs / rhs.significand_};
-    const auto res_exp {(lhs.biased_exponent() - offset) - rhs.biased_exponent()};
-
-    q = decimal_fast64_t{res_sig, res_exp, sign};
+    q = detail::d64_generic_div_impl<decimal_fast64_t>(lhs.to_components(), rhs.to_components(), sign);
 }
 
 constexpr auto operator/(const decimal_fast64_t& lhs, const decimal_fast64_t& rhs) noexcept -> decimal_fast64_t

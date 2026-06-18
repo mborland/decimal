@@ -3028,6 +3028,30 @@ BOOST_DECIMAL_DETAIL_INT128_HOST_DEVICE constexpr uint128_t operator/(const uint
     #if defined(BOOST_DECIMAL_DETAIL_INT128_HAS_INT128) && !defined(__s390__) && !defined(__s390x__)
     else
     {
+        // On x86-64 GCC/Clang the __int128 builtin lowers to __udivti3 which
+        // runs Knuth-D (~70-90c). Route runtime calls to the Moller-Granlund
+        // 2x2 divide that backs the MSVC path (~25-30c). constexpr context
+        // still uses the builtin (inline asm is not constexpr).
+        #if defined(BOOST_DECIMAL_DETAIL_INT128_HAS_FAST_DIV128) && !defined(BOOST_DECIMAL_DETAIL_INT128_NO_CONSTEVAL_DETECTION) && (defined(__GNUC__) || defined(__clang__))
+        if (!BOOST_DECIMAL_DETAIL_INT128_IS_CONSTANT_EVALUATED(lhs))
+        {
+            // uint128/uint64 short-circuit: div_mod_intrinsic's 2x2 path
+            // forces countl_zero(divisor.high)=64 -> shift by 64, producing a
+            // correct but extra-work result. one_word_div hits a single divq.
+            if (rhs.high == 0U)
+            {
+                if (lhs.high == 0U)
+                {
+                    return {0, lhs.low / rhs.low};
+                }
+                uint128_t quotient {};
+                detail::one_word_div(lhs, rhs.low, quotient);
+                return quotient;
+            }
+            uint128_t remainder{};
+            return detail::impl::div_mod_intrinsic<false>(lhs, rhs, remainder);
+        }
+        #endif
         return static_cast<uint128_t>(static_cast<detail::builtin_u128>(lhs) / static_cast<detail::builtin_u128>(rhs));
     }
     #else
@@ -3239,6 +3263,28 @@ BOOST_DECIMAL_DETAIL_INT128_HOST_DEVICE constexpr uint128_t operator%(const uint
     #if defined(BOOST_DECIMAL_DETAIL_INT128_HAS_INT128) && !defined(__s390__) && !defined(__s390x__)
     else
     {
+        // See operator/ for the rationale on routing x86-64 GCC/Clang
+        // runtime calls through the Moller-Granlund 2x2 divide.
+        #if defined(BOOST_DECIMAL_DETAIL_INT128_HAS_FAST_DIV128) && !defined(BOOST_DECIMAL_DETAIL_INT128_NO_CONSTEVAL_DETECTION) && (defined(__GNUC__) || defined(__clang__))
+        if (!BOOST_DECIMAL_DETAIL_INT128_IS_CONSTANT_EVALUATED(lhs))
+        {
+            // uint128/uint64 short-circuit (see operator/ for the rationale).
+            if (rhs.high == 0U)
+            {
+                if (lhs.high == 0U)
+                {
+                    return {0, lhs.low % rhs.low};
+                }
+                uint128_t quotient {};
+                uint128_t remainder {};
+                detail::one_word_div(lhs, rhs.low, quotient, remainder);
+                return remainder;
+            }
+            uint128_t remainder{};
+            detail::impl::div_mod_intrinsic<true>(lhs, rhs, remainder);
+            return remainder;
+        }
+        #endif
         return static_cast<uint128_t>(static_cast<detail::builtin_u128>(lhs) % static_cast<detail::builtin_u128>(rhs));
     }
     #else
