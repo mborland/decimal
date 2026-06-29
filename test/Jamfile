@@ -239,6 +239,7 @@ run ../example/addition.cpp ;
 run ../example/debugger.cpp ;
 run ../example/binary_float_conversions.cpp ;
 run ../example/integral_conversions.cpp ;
+run ../example/decompose_frexp10_normalize.cpp ;
 
 # Test compilation of separate headers
 compile compile_tests/bid_conversion.cpp ;
