@@ -179,11 +179,12 @@ jobs:
           path: benchmarks-libbid-windows-x64.txt
           if-no-files-found: warn
 
-  # Reproduces the "Intel Compiler" Intel BID rows of the x64 Linux benchmarks
-  # documentation by building libbid and benchmark_libbid.c with Intel oneAPI
-  # icx. The libbid benchmark is self-contained and does not need Boost.
+  # Reproduces the "Intel Compiler" x64 Linux benchmarks: the Boost.Decimal
+  # types via benchmarks.cpp built with icpx, and the Intel BID rows via libbid
+  # and benchmark_libbid.c built with icx. icpx/icx are the LLVM-based Intel
+  # oneAPI compilers.
   linux-intel:
-    name: Linux Intel oneAPI icx 64-bit
+    name: Linux Intel oneAPI icx/icpx 64-bit
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -205,6 +206,41 @@ jobs:
         run: |
           source /opt/intel/oneapi/setvars.sh
           printenv >> $GITHUB_ENV
+      - name: Setup Boost
+        run: |
+          LIBRARY=${GITHUB_REPOSITORY#*/}
+          echo "LIBRARY=$LIBRARY" >> $GITHUB_ENV
+          REF=${GITHUB_BASE_REF:-$GITHUB_REF}
+          REF=${REF#refs/heads/}
+          BOOST_BRANCH=develop && [ "$REF" = "master" ] && BOOST_BRANCH=master || true
+          echo "BOOST_BRANCH: $BOOST_BRANCH"
+          cd ..
+          git clone -b "$BOOST_BRANCH" --depth 1 "https://github.com/boostorg/boost.git" boost-root
+          cd boost-root
+          mkdir -p libs/$LIBRARY
+          cp -r "$GITHUB_WORKSPACE"/* libs/$LIBRARY
+          git submodule update --init tools/boostdep
+          python tools/boostdep/depinst/depinst.py --git_args "--jobs $GIT_FETCH_JOBS" $LIBRARY
+          ./bootstrap.sh
+          ./b2 headers
+          # icpx is the LLVM/clang-based Intel oneAPI compiler, so drive it through
+          # b2's clang toolset rather than the legacy intel-linux (icc) toolset.
+          echo "using clang : intel : icpx ;" > ~/user-config.jam
+      - name: Run Boost.Decimal benchmarks (icpx, release)
+        run: |
+          cd ../boost-root
+          ./b2 -j$(nproc) toolset=clang-intel cxxstd=20 variant=release address-model=64 \
+            define=BOOST_DECIMAL_RUN_BENCHMARKS libs/$LIBRARY/test//benchmarks
+          echo "==================== Benchmark results (Linux icpx 64-bit) ===================="
+          find bin.v2 -path '*release*' -name 'benchmarks.output' -exec cat {} +
+          find bin.v2 -path '*release*' -name 'benchmarks.output' -exec cp {} "$GITHUB_WORKSPACE/benchmarks-linux-icpx-64-bit.txt" \;
+      - name: Upload Boost.Decimal benchmark output
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: benchmarks-linux-icpx-64-bit
+          path: benchmarks-linux-icpx-64-bit.txt
+          if-no-files-found: warn
       - name: Build and run Intel libbid benchmark (icx, release)
         run: |
           cd "$GITHUB_WORKSPACE"
