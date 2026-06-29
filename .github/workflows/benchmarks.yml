@@ -47,6 +47,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y g++-14 g++-14-multilib gcc-14
+          # The Intel libbid makefile only accepts CC names icx/icc/icl/gcc/cl/cc/clang,
+          # so expose gcc-14 under the plain name gcc (and use its 32-bit multilib).
+          sudo ln -sf /usr/bin/gcc-14 /usr/local/bin/gcc
       - name: Setup Boost
         run: |
           LIBRARY=${GITHUB_REPOSITORY#*/}
@@ -82,18 +85,26 @@ jobs:
           if-no-files-found: warn
       # The Intel Decimal Floating-Point Math Library (libbid) supports IA-32 and
       # Intel x64, so it is benchmarked on both the 32-bit and 64-bit GCC builds.
+      # The netlib tarball is cached, so it is fetched at most once per cache window.
+      - name: Cache Intel RDFP tarball
+        uses: actions/cache@v4
+        with:
+          path: intel-rdfp.tar.gz
+          key: intel-rdfp-IntelRDFPMathLib20U4
       - name: Build and run Intel libbid benchmark (release)
         run: |
           cd "$GITHUB_WORKSPACE"
           MARCH=""
           if [ "${{ matrix.address_model }}" = "32" ]; then MARCH="-m32"; fi
-          curl -fL --retry 3 -o intel-rdfp.tar.gz \
-            https://www.netlib.org/misc/intel/IntelRDFPMathLib20U4.tar.gz
+          if [ ! -f intel-rdfp.tar.gz ]; then
+            curl -fL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 --max-time 600 \
+              -o intel-rdfp.tar.gz https://www.netlib.org/misc/intel/IntelRDFPMathLib20U4.tar.gz
+          fi
           mkdir -p intel-rdfp
           tar xzf intel-rdfp.tar.gz -C intel-rdfp
           mv intel-rdfp/LIBRARY ./LIBRARY
-          ( cd LIBRARY && make CC="gcc-14 $MARCH" CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0 -j"$(nproc)" )
-          gcc-14 $MARCH test/benchmark_libbid.c -O3 -std=c17 LIBRARY/libbid.a -o benchmark_libbid -lm
+          ( cd LIBRARY && make CC="gcc $MARCH" CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0 -j"$(nproc)" )
+          gcc $MARCH test/benchmark_libbid.c -O3 -std=c17 LIBRARY/libbid.a -o benchmark_libbid -lm
           echo "==================== Intel libbid results (Linux GCC ${{ matrix.address_model }}-bit) ===================="
           ./benchmark_libbid | tee "benchmarks-libbid-linux-gcc-${{ matrix.address_model }}-bit.txt"
       - name: Upload Intel libbid benchmark output
@@ -110,7 +121,7 @@ jobs:
           cd "$GITHUB_WORKSPACE"
           MARCH=""
           if [ "${{ matrix.address_model }}" = "32" ]; then MARCH="-m32"; fi
-          gcc-14 $MARCH test/benchmark_libdfp.c -O3 -std=c17 -o benchmark_libdfp
+          gcc $MARCH test/benchmark_libdfp.c -O3 -std=c17 -o benchmark_libdfp
           echo "==================== GCC _Decimal results (Linux GCC ${{ matrix.address_model }}-bit) ===================="
           ./benchmark_libdfp | tee "benchmarks-libdfp-linux-gcc-${{ matrix.address_model }}-bit.txt"
       - name: Upload GCC _Decimal benchmark output
@@ -173,13 +184,21 @@ jobs:
       # The Intel Decimal Floating-Point Math Library (libbid) only supports
       # IA-32, IA-64 and Intel x64, so it is benchmarked on the x64 runner only,
       # matching the "x64 Windows" Intel results in the benchmarks documentation.
+      # The netlib tarball is cached, so it is fetched at most once per cache window.
+      - name: Cache Intel RDFP tarball
+        if: ${{ matrix.arch == 'x64' }}
+        uses: actions/cache@v4
+        with:
+          path: intel-rdfp.tar.gz
+          key: intel-rdfp-IntelRDFPMathLib20U4
       - name: Build and run Intel libbid benchmark (release)
         if: ${{ matrix.arch == 'x64' }}
         run: |
           for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSPATH=%%i"
           call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 1
           cd /d "%GITHUB_WORKSPACE%"
-          curl -fL --retry 3 -o intel-rdfp.tar.gz https://www.netlib.org/misc/intel/IntelRDFPMathLib20U4.tar.gz || exit /b 1
+          if not exist intel-rdfp.tar.gz curl -fL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 --max-time 600 -o intel-rdfp.tar.gz https://www.netlib.org/misc/intel/IntelRDFPMathLib20U4.tar.gz
+          if not exist intel-rdfp.tar.gz exit /b 1
           tar -xzf intel-rdfp.tar.gz || exit /b 1
           cd LIBRARY
           nmake -fmakefile.mak CC=cl CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0 || exit /b 1
@@ -258,11 +277,18 @@ jobs:
           name: benchmarks-linux-icpx-64-bit
           path: benchmarks-linux-icpx-64-bit.txt
           if-no-files-found: warn
+      - name: Cache Intel RDFP tarball
+        uses: actions/cache@v4
+        with:
+          path: intel-rdfp.tar.gz
+          key: intel-rdfp-IntelRDFPMathLib20U4
       - name: Build and run Intel libbid benchmark (icx, release)
         run: |
           cd "$GITHUB_WORKSPACE"
-          curl -fL --retry 3 -o intel-rdfp.tar.gz \
-            https://www.netlib.org/misc/intel/IntelRDFPMathLib20U4.tar.gz
+          if [ ! -f intel-rdfp.tar.gz ]; then
+            curl -fL --retry 5 --retry-delay 5 --retry-all-errors --connect-timeout 30 --max-time 600 \
+              -o intel-rdfp.tar.gz https://www.netlib.org/misc/intel/IntelRDFPMathLib20U4.tar.gz
+          fi
           mkdir -p intel-rdfp
           tar xzf intel-rdfp.tar.gz -C intel-rdfp
           mv intel-rdfp/LIBRARY ./LIBRARY
