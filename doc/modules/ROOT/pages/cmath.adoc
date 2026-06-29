@@ -680,6 +680,10 @@ constexpr auto decompose(const Decimal value) noexcept -> decimal_components<Dec
 } // namespace boost
 ----
 
+This function decomposes the input decimal value into a struct containing the significand, exponent, and sign.
+This function does not modify the stored value at all, so it returns the significand and exponent non-normalized i.e., in the cohort that they are stored in.
+For further discussion on normalized form see the page on xref:cohorts.adoc[cohorts].
+
 === `frexp10`
 
 [source, c++]
