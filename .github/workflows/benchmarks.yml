@@ -80,6 +80,29 @@ jobs:
           name: benchmarks-linux-gcc-${{ matrix.address_model }}-bit
           path: benchmarks-linux-gcc-${{ matrix.address_model }}-bit.txt
           if-no-files-found: warn
+      # The Intel Decimal Floating-Point Math Library (libbid) only supports
+      # IA-32, IA-64 and Intel x64, so it is benchmarked on the x64 build only,
+      # matching the "x64 Linux" Intel results in the benchmarks documentation.
+      - name: Build and run Intel libbid benchmark (release)
+        if: ${{ matrix.address_model == 64 }}
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          curl -fL --retry 3 -o intel-rdfp.tar.gz \
+            https://www.netlib.org/misc/intel/IntelRDFPMathLib20U4.tar.gz
+          mkdir -p intel-rdfp
+          tar xzf intel-rdfp.tar.gz -C intel-rdfp
+          mv intel-rdfp/LIBRARY ./LIBRARY
+          ( cd LIBRARY && make CC=gcc CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0 -j"$(nproc)" )
+          gcc test/benchmark_libbid.c -O3 -std=c17 LIBRARY/libbid.a -o benchmark_libbid -lm
+          echo "==================== Intel libbid results (Linux GCC 64-bit) ===================="
+          ./benchmark_libbid | tee "benchmarks-libbid-linux-gcc-64-bit.txt"
+      - name: Upload Intel libbid benchmark output
+        if: ${{ always() && matrix.address_model == 64 }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: benchmarks-libbid-linux-gcc-64-bit
+          path: benchmarks-libbid-linux-gcc-64-bit.txt
+          if-no-files-found: warn
 
   windows:
     name: ${{ matrix.name }}
@@ -129,4 +152,75 @@ jobs:
         with:
           name: benchmarks-windows-${{ matrix.arch }}
           path: benchmarks-windows-${{ matrix.arch }}.txt
+          if-no-files-found: warn
+      # The Intel Decimal Floating-Point Math Library (libbid) only supports
+      # IA-32, IA-64 and Intel x64, so it is benchmarked on the x64 runner only,
+      # matching the "x64 Windows" Intel results in the benchmarks documentation.
+      - name: Build and run Intel libbid benchmark (release)
+        if: ${{ matrix.arch == 'x64' }}
+        run: |
+          for /f "usebackq tokens=*" %%i in (`"%ProgramFiles(x86)%\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath`) do set "VSPATH=%%i"
+          call "%VSPATH%\VC\Auxiliary\Build\vcvars64.bat" || exit /b 1
+          cd /d "%GITHUB_WORKSPACE%"
+          curl -fL --retry 3 -o intel-rdfp.tar.gz https://www.netlib.org/misc/intel/IntelRDFPMathLib20U4.tar.gz || exit /b 1
+          tar -xzf intel-rdfp.tar.gz || exit /b 1
+          cd LIBRARY
+          nmake -fmakefile.mak CC=cl CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0 || exit /b 1
+          cd ..
+          cl test\benchmark_libbid.c /O2 /std:c17 /Fe:benchmark_libbid.exe LIBRARY\libbid.lib || exit /b 1
+          echo ==================== Intel libbid results (Windows x64) ====================
+          benchmark_libbid.exe > benchmarks-libbid-windows-x64.txt
+          type benchmarks-libbid-windows-x64.txt
+      - name: Upload Intel libbid benchmark output
+        if: ${{ always() && matrix.arch == 'x64' }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: benchmarks-libbid-windows-x64
+          path: benchmarks-libbid-windows-x64.txt
+          if-no-files-found: warn
+
+  # Reproduces the "Intel Compiler" Intel BID rows of the x64 Linux benchmarks
+  # documentation by building libbid and benchmark_libbid.c with Intel oneAPI
+  # icx. The libbid benchmark is self-contained and does not need Boost.
+  linux-intel:
+    name: Linux Intel oneAPI icx 64-bit
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v6
+      - name: Intel Apt repository
+        timeout-minutes: 1
+        run: |
+          wget https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS-2023.PUB
+          sudo apt-key add GPG-PUB-KEY-INTEL-SW-PRODUCTS-2023.PUB
+          rm GPG-PUB-KEY-INTEL-SW-PRODUCTS-2023.PUB
+          echo "deb https://apt.repos.intel.com/oneapi all main" | sudo tee /etc/apt/sources.list.d/oneAPI.list
+          sudo apt-get update
+      - name: Install Intel oneAPI compiler
+        timeout-minutes: 5
+        run: sudo apt-get install -y intel-oneapi-compiler-dpcpp-cpp
+      - name: Setup Intel oneAPI environment
+        run: |
+          source /opt/intel/oneapi/setvars.sh
+          printenv >> $GITHUB_ENV
+      - name: Build and run Intel libbid benchmark (icx, release)
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          curl -fL --retry 3 -o intel-rdfp.tar.gz \
+            https://www.netlib.org/misc/intel/IntelRDFPMathLib20U4.tar.gz
+          mkdir -p intel-rdfp
+          tar xzf intel-rdfp.tar.gz -C intel-rdfp
+          mv intel-rdfp/LIBRARY ./LIBRARY
+          ( cd LIBRARY && make CC=icx CALL_BY_REF=0 GLOBAL_RND=0 GLOBAL_FLAGS=0 UNCHANGED_BINARY_FLAGS=0 -j"$(nproc)" )
+          icx test/benchmark_libbid.c -O3 -std=c17 LIBRARY/libbid.a -o benchmark_libbid -lm
+          echo "==================== Intel libbid results (Linux icx 64-bit) ===================="
+          ./benchmark_libbid | tee "benchmarks-libbid-linux-icx-64-bit.txt"
+      - name: Upload Intel libbid benchmark output
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: benchmarks-libbid-linux-icx-64-bit
+          path: benchmarks-libbid-linux-icx-64-bit.txt
           if-no-files-found: warn
