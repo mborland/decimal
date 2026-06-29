@@ -1322,6 +1322,161 @@ Run on the GitHub Actions `windows-latest` runner using MSVC in release mode.
 | 1.913
 |===
 
+[#arm64_windows_benchmarks]
+== ARM64 Windows
+
+Run on the GitHub Actions `windows-11-arm` runner using MSVC in release mode.
+
+=== Comparisons
+
+|===
+| Type | Runtime (us) | Ratio to `double`
+| `float`
+| 182,631
+| 1.021
+| `double`
+| 178,811
+| 1.000
+| `decimal32_t`
+| 1,675,672
+| 9.371
+| `decimal64_t`
+| 2,204,593
+| 12.329
+| `decimal128_t`
+| 8,820,649
+| 49.329
+| `decimal_fast32_t`
+| 873,023
+| 4.882
+| `decimal_fast64_t`
+| 892,885
+| 4.993
+| `decimal_fast128_t`
+| 891,362
+| 4.985
+|===
+
+=== Addition
+
+|===
+| Type | Runtime (us) | Ratio to `double`
+| `float`
+| 54,458
+| 0.885
+| `double`
+| 61,551
+| 1.000
+| `decimal32_t`
+| 2,203,310
+| 35.796
+| `decimal64_t`
+| 2,235,741
+| 36.323
+| `decimal128_t`
+| 5,484,163
+| 89.099
+| `decimal_fast32_t`
+| 1,503,891
+| 24.433
+| `decimal_fast64_t`
+| 1,996,293
+| 32.433
+| `decimal_fast128_t`
+| 2,922,130
+| 47.475
+|===
+
+=== Subtraction
+
+|===
+| Type | Runtime (us) | Ratio to `double`
+| `float`
+| 54,309
+| 0.904
+| `double`
+| 60,063
+| 1.000
+| `decimal32_t`
+| 2,344,101
+| 39.027
+| `decimal64_t`
+| 2,461,049
+| 40.974
+| `decimal128_t`
+| 5,257,033
+| 87.525
+| `decimal_fast32_t`
+| 1,875,233
+| 31.221
+| `decimal_fast64_t`
+| 2,356,630
+| 39.236
+| `decimal_fast128_t`
+| 3,255,466
+| 54.201
+|===
+
+=== Multiplication
+
+|===
+| Type | Runtime (us) | Ratio to `double`
+| `float`
+| 55,894
+| 0.884
+| `double`
+| 63,214
+| 1.000
+| `decimal32_t`
+| 3,284,833
+| 51.964
+| `decimal64_t`
+| 4,325,658
+| 68.429
+| `decimal128_t`
+| 15,701,811
+| 248.391
+| `decimal_fast32_t`
+| 2,314,410
+| 36.612
+| `decimal_fast64_t`
+| 3,827,303
+| 60.545
+| `decimal_fast128_t`
+| 15,460,123
+| 244.568
+|===
+
+=== Division
+
+|===
+| Type | Runtime (us) | Ratio to `double`
+| `float`
+| 56,253
+| 0.379
+| `double`
+| 148,333
+| 1.000
+| `decimal32_t`
+| 3,657,033
+| 24.654
+| `decimal64_t`
+| 7,237,316
+| 48.791
+| `decimal128_t`
+| 16,783,738
+| 113.149
+| `decimal_fast32_t`
+| 2,750,815
+| 18.545
+| `decimal_fast64_t`
+| 6,732,683
+| 45.389
+| `decimal_fast128_t`
+| 14,954,134
+| 100.815
+|===
+
 [#m4_mac_benchmarks]
 == ARM64 macOS
 
@@ -1659,159 +1814,4 @@ Run using a Macbook pro with M4 Max chipset running macOS Tahoe 26.5.1 and homeb
 | `decimal_fast128_t`
 | 5,300,774
 | 1.189
-|===
-
-[#arm64_windows_benchmarks]
-== ARM64 Windows
-
-Run on the GitHub Actions `windows-11-arm` runner using MSVC in release mode.
-
-=== Comparisons
-
-|===
-| Type | Runtime (us) | Ratio to `double`
-| `float`
-| 182,631
-| 1.021
-| `double`
-| 178,811
-| 1.000
-| `decimal32_t`
-| 1,675,672
-| 9.371
-| `decimal64_t`
-| 2,204,593
-| 12.329
-| `decimal128_t`
-| 8,820,649
-| 49.329
-| `decimal_fast32_t`
-| 873,023
-| 4.882
-| `decimal_fast64_t`
-| 892,885
-| 4.993
-| `decimal_fast128_t`
-| 891,362
-| 4.985
-|===
-
-=== Addition
-
-|===
-| Type | Runtime (us) | Ratio to `double`
-| `float`
-| 54,458
-| 0.885
-| `double`
-| 61,551
-| 1.000
-| `decimal32_t`
-| 2,203,310
-| 35.796
-| `decimal64_t`
-| 2,235,741
-| 36.323
-| `decimal128_t`
-| 5,484,163
-| 89.099
-| `decimal_fast32_t`
-| 1,503,891
-| 24.433
-| `decimal_fast64_t`
-| 1,996,293
-| 32.433
-| `decimal_fast128_t`
-| 2,922,130
-| 47.475
-|===
-
-=== Subtraction
-
-|===
-| Type | Runtime (us) | Ratio to `double`
-| `float`
-| 54,309
-| 0.904
-| `double`
-| 60,063
-| 1.000
-| `decimal32_t`
-| 2,344,101
-| 39.027
-| `decimal64_t`
-| 2,461,049
-| 40.974
-| `decimal128_t`
-| 5,257,033
-| 87.525
-| `decimal_fast32_t`
-| 1,875,233
-| 31.221
-| `decimal_fast64_t`
-| 2,356,630
-| 39.236
-| `decimal_fast128_t`
-| 3,255,466
-| 54.201
-|===
-
-=== Multiplication
-
-|===
-| Type | Runtime (us) | Ratio to `double`
-| `float`
-| 55,894
-| 0.884
-| `double`
-| 63,214
-| 1.000
-| `decimal32_t`
-| 3,284,833
-| 51.964
-| `decimal64_t`
-| 4,325,658
-| 68.429
-| `decimal128_t`
-| 15,701,811
-| 248.391
-| `decimal_fast32_t`
-| 2,314,410
-| 36.612
-| `decimal_fast64_t`
-| 3,827,303
-| 60.545
-| `decimal_fast128_t`
-| 15,460,123
-| 244.568
-|===
-
-=== Division
-
-|===
-| Type | Runtime (us) | Ratio to `double`
-| `float`
-| 56,253
-| 0.379
-| `double`
-| 148,333
-| 1.000
-| `decimal32_t`
-| 3,657,033
-| 24.654
-| `decimal64_t`
-| 7,237,316
-| 48.791
-| `decimal128_t`
-| 16,783,738
-| 113.149
-| `decimal_fast32_t`
-| 2,750,815
-| 18.545
-| `decimal_fast64_t`
-| 6,732,683
-| 45.389
-| `decimal_fast128_t`
-| 14,954,134
-| 100.815
 |===
