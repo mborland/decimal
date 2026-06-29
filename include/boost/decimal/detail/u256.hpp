@@ -31,11 +31,14 @@ u256
     std::uint64_t bytes[4] {};
 
     // Constructors
-    BOOST_DECIMAL_CUDA_CONSTEXPR u256() noexcept = default;
-    BOOST_DECIMAL_CUDA_CONSTEXPR u256(const u256& other) noexcept = default;
-    BOOST_DECIMAL_CUDA_CONSTEXPR u256(u256&& other) noexcept = default;
-    BOOST_DECIMAL_CUDA_CONSTEXPR u256& operator=(const u256& other) noexcept = default;
-    BOOST_DECIMAL_CUDA_CONSTEXPR u256& operator=(u256&& other) noexcept = default;
+    // Defaulted special members are left as plain constexpr.
+    // NVCC implicitly treats them as__host__ __device__,
+    // and annotating them triggers warning #20012-D in consumer code.
+    constexpr u256() noexcept = default;
+    constexpr u256(const u256& other) noexcept = default;
+    constexpr u256(u256&& other) noexcept = default;
+    constexpr u256& operator=(const u256& other) noexcept = default;
+    constexpr u256& operator=(u256&& other) noexcept = default;
 
     BOOST_DECIMAL_CUDA_CONSTEXPR u256(std::uint64_t byte3, std::uint64_t byte2, std::uint64_t byte1, std::uint64_t byte0) noexcept;
     BOOST_DECIMAL_CUDA_CONSTEXPR u256(const int128::uint128_t x) noexcept { bytes[0] = x.low; bytes[1] = x.high; }
