@@ -388,3 +388,24 @@ Value as bytes: 68ec8a46
 Successfully recovered all values from file
 ....
 ====
+
+[#examples_cuda]
+== CUDA Usage
+
+The library's types and many of its functions can be used on the GPU when compiling with NVCC.
+Define xref:config.adoc#enable_cuda[`BOOST_DECIMAL_ENABLE_CUDA`] before including any library header to enable both host and device support, and compile with NVCC's `--expt-relaxed-constexpr` flag (as used by the library's own CUDA tests).
+
+.This https://github.com/boostorg/decimal/blob/develop/example/cuda.cu[example] demonstrates how to use a decimal type and its operations inside a CUDA kernel.
+====
+[source, c++]
+----
+include::example$cuda.cu[]
+----
+
+.Expected Output:
+....
+[Vector operation on 50000 elements]
+CUDA kernel launch with 196 blocks of 256 threads
+All CPU and GPU computed elements match!
+....
+====
