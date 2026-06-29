@@ -87,7 +87,7 @@ jobs:
       # Intel x64, so it is benchmarked on both the 32-bit and 64-bit GCC builds.
       # The netlib tarball is cached, so it is fetched at most once per cache window.
       - name: Cache Intel RDFP tarball
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: intel-rdfp.tar.gz
           key: intel-rdfp-IntelRDFPMathLib20U4
@@ -187,7 +187,7 @@ jobs:
       # The netlib tarball is cached, so it is fetched at most once per cache window.
       - name: Cache Intel RDFP tarball
         if: ${{ matrix.arch == 'x64' }}
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: intel-rdfp.tar.gz
           key: intel-rdfp-IntelRDFPMathLib20U4
@@ -278,7 +278,7 @@ jobs:
           path: benchmarks-linux-icpx-64-bit.txt
           if-no-files-found: warn
       - name: Cache Intel RDFP tarball
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: intel-rdfp.tar.gz
           key: intel-rdfp-IntelRDFPMathLib20U4
