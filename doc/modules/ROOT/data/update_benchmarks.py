@@ -6,9 +6,10 @@
 # Updates the benchmark tables in ../pages/benchmarks.adoc from the .txt
 # benchmark outputs in this directory.
 #
-# Two output formats are recognized:
-#   * Boost.Decimal (test/benchmarks.cpp): "comparisons<float        >: 90576 us"
-#   * Intel libbid (test/benchmark_libbid.c): "Comparisons    <Decimal32  >: 6072528 us"
+# Output formats recognized (all share the same "<type>: N us" row layout):
+#   * Boost.Decimal (test/benchmarks.cpp):     "comparisons<float        >: 90576 us"
+#   * Intel libbid  (test/benchmark_libbid.c): "Comparisons    <Decimal32  >: 6072528 us"
+#   * GCC _Decimal  (test/benchmark_libdfp.c): "Comparisons    <_Decimal32 >: 831820 us"
 #
 # For every table that has data, the Runtime (us) cell is updated for each row
 # the data covers, then the Ratio to double cell is recomputed for every row in
@@ -41,13 +42,20 @@ TYPE_TO_CELL = {
     "Decimal32":    "Intel `BID_UINT32`",
     "Decimal64":    "Intel `BID_UINT64`",
     "Decimal128":   "Intel `BID_UINT128`",
+    "_Decimal32":   "GCC `_Decimal32`",
+    "_Decimal64":   "GCC `_Decimal64`",
+    "_Decimal128":  "GCC `_Decimal128`",
 }
 
 # Section anchors that are updated.
 SECTION_ANCHOR = {
     "x64_linux":     "[#x64_linux_benchmarks]",
+    "x32_linux":     "[#x32_linux_benchmarks]",
     "x64_windows":   "[#x64_windows_benchmarks]",
     "arm64_windows": "[#arm64_windows_benchmarks]",
+    # The macos workflow job drives the ARM64 macOS tables (replacing the
+    # earlier manual M4 Max numbers).
+    "macos":         "[#m4_mac_benchmarks]",
 }
 # Anchors used only to bound sections (not updated: no data files for them).
 OTHER_ANCHORS = ["[#m4_mac_benchmarks]"]
@@ -59,9 +67,14 @@ FILE_MAP = {
     "benchmarks-libbid-linux-icx-64-bit.txt": ("x64_linux", "Intel Compiler"),
     "benchmarks-linux-gcc-64-bit.txt":        ("x64_linux", "GCC"),
     "benchmarks-libbid-linux-gcc-64-bit.txt": ("x64_linux", "GCC"),
+    "benchmarks-libdfp-linux-gcc-64-bit.txt": ("x64_linux", "GCC"),
+    "benchmarks-linux-gcc-32-bit.txt":        ("x32_linux", None),
+    "benchmarks-libbid-linux-gcc-32-bit.txt": ("x32_linux", None),
+    "benchmarks-libdfp-linux-gcc-32-bit.txt": ("x32_linux", None),
     "benchmarks-windows-x64.txt":             ("x64_windows", None),
     "benchmarks-libbid-windows-x64.txt":      ("x64_windows", None),
     "benchmarks-windows-arm64.txt":           ("arm64_windows", None),
+    "benchmarks-macos-arm64.txt":             ("macos", None),
 }
 
 OP_HEADER_RE = re.compile(r"^=====\s*(.+?)\s*=====$")
