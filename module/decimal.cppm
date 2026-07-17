@@ -7,8 +7,10 @@ module;
 
 // import std exports declarations but not macros. The C headers below provide the
 // feature-test macros and object-like macros the library uses (assert, errno,
-// FE_ rounding, FLT_/DBL_ limits, LC_ locale, INT64_C, ...) so they are included
-// regardless of whether import std is used.
+// FE_ rounding, FLT_/DBL_ limits, LC_ locale, INT64_C, the stdout/stderr streams,
+// ...) so they are included regardless of whether import std is used. import std
+// (and std.compat) deliberately do not provide stdout/stderr/stdin, so <cstdio>
+// must be textual here for boost::decimal::printf's fprintf(stdout, ...).
 #include <version>
 #include <cassert>
 #include <cerrno>
@@ -20,6 +22,7 @@ module;
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <cwchar>
