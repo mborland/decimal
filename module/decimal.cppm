@@ -1,0 +1,145 @@
+// Copyright 2024 Matt Borland
+// Distributed under the Boost Software License, Version 1.0.
+// https://www.boost.org/LICENSE_1_0.txt
+
+// Global module fragment required for non-module preprocessing
+module;
+
+// import std exports declarations but not macros. The C headers below provide the
+// feature-test macros and object-like macros the library uses (assert, errno,
+// FE_ rounding, FLT_/DBL_ limits, LC_ locale, INT64_C, ...) so they are included
+// regardless of whether import std is used.
+#include <version>
+#include <cassert>
+#include <cerrno>
+#include <cfenv>
+#include <cfloat>
+#include <cinttypes>
+#include <climits>
+#include <clocale>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <cwchar>
+
+// Platform intrinsic headers are not part of the standard library module, so
+// they are always brought in here.
+#if defined(_MSC_VER)
+#  include <intrin.h>
+#elif defined(__x86_64__)
+#  include <x86intrin.h>
+#elif defined(__ARM_NEON__)
+#  include <arm_neon.h>
+#endif
+
+// When the standard library module is available these are provided by import
+// std, otherwise they are supplied here in the global module fragment.
+#ifndef BOOST_DECIMAL_USE_STD_MODULE
+
+#include <algorithm>
+#include <array>
+#include <bit>
+#include <charconv>
+#include <compare>
+#include <complex>
+#include <concepts>
+#include <functional>
+#include <initializer_list>
+#include <iomanip>
+#include <ios>
+#include <iosfwd>
+#include <iostream>
+#include <iterator>
+#include <limits>
+#include <locale>
+#include <memory>
+#include <new>
+#include <ostream>
+#include <sstream>
+#include <string>
+#include <string_view>
+#include <system_error>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+
+// <stdfloat> is a C++23 feature that is not everywhere yet
+#if __has_include(<stdfloat>)
+#  include <stdfloat>
+#endif
+
+#endif // BOOST_DECIMAL_USE_STD_MODULE
+
+#define BOOST_DECIMAL_BUILD_MODULE
+
+// The vendored Boost.Int128 keys its inline-constexpr and export macros off its
+// own build-module flag; set it so its detail constants get inline (external)
+// linkage rather than static, otherwise extern "C++" exposes them as TU-local.
+#define BOOST_DECIMAL_DETAIL_INT128_BUILD_MODULE
+
+export module boost.decimal;
+
+#ifdef BOOST_DECIMAL_USE_STD_MODULE
+import std;
+#endif
+
+// Wrap the exported declarations in extern "C++" so they attach to the global
+// module (classic mangling), keeping the module and header forms ABI compatible.
+extern "C++" {
+
+// Forward declarations are not available so add the contents of fwd.hpp here
+
+export namespace boost::decimal {
+
+class decimal32_t;
+class decimal64_t;
+class decimal128_t;
+
+class decimal_fast32_t;
+class decimal_fast64_t;
+class decimal_fast128_t;
+
+} // namespace boost::decimal
+
+export namespace std {
+
+template <>
+class numeric_limits<boost::decimal::decimal32_t>;
+
+template <>
+class numeric_limits<boost::decimal::decimal_fast32_t>;
+
+template <>
+class numeric_limits<boost::decimal::decimal64_t>;
+
+template <>
+class numeric_limits<boost::decimal::decimal_fast64_t>;
+
+template <>
+class numeric_limits<boost::decimal::decimal128_t>;
+
+template <>
+class numeric_limits<boost::decimal::decimal_fast128_t>;
+
+} // Namespace std
+
+// MSVC wants <boost/decimal> to be imported but also does not support importing it...
+#ifdef _MSC_VER
+#  pragma warning( push )
+#  pragma warning( disable : 5244 )
+#elif defined(__clang__)
+#  pragma clang diagnostic push
+#  pragma clang diagnostic ignored "-Winclude-angled-in-module-purview"
+#endif
+
+#include <boost/decimal.hpp>
+
+#ifdef _MSC_VER
+#  pragma warning( pop )
+#elif defined(__clang__)
+#  pragma clang diagnostic pop
+#endif
+
+} // extern "C++"
