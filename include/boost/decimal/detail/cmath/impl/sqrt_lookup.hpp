@@ -25,6 +25,8 @@
 // Combined with Newton refinement in approx_recip_sqrt_impl.hpp, reaches 32+ bits.
 // ============================================================================
 
+#include <boost/decimal/detail/config.hpp>
+
 #ifndef BOOST_DECIMAL_BUILD_MODULE
 #include <cstdint>
 #endif
@@ -35,7 +37,7 @@ namespace detail {
 namespace sqrt_lookup {
 
 // recip_sqrt_k0s[i] = 10^16 / sqrt(1 + i * 0.1) at left edge of bin
-static constexpr std::uint64_t recip_sqrt_k0s[90] = {
+BOOST_DECIMAL_INLINE_CONSTEXPR_VARIABLE std::uint64_t recip_sqrt_k0s[90] = {
     10000000000000000ULL, 9534625892455923ULL, 9128709291752768ULL, 8770580193070292ULL,
     8451542547285165ULL, 8164965809277260ULL, 7905694150420948ULL, 7669649888473704ULL,
     7453559924999298ULL, 7254762501100116ULL, 7071067811865475ULL, 6900655593423542ULL,
@@ -62,7 +64,7 @@ static constexpr std::uint64_t recip_sqrt_k0s[90] = {
 };
 
 // recip_sqrt_k1s[i] = k0[i] - k0[i+1] (slope for linear interpolation)
-static constexpr std::uint64_t recip_sqrt_k1s[90] = {
+BOOST_DECIMAL_INLINE_CONSTEXPR_VARIABLE std::uint64_t recip_sqrt_k1s[90] = {
     465374107544077ULL, 405916600703155ULL, 358129098682476ULL, 319037645785127ULL,
     286576738007905ULL, 259271658856312ULL, 236044261947244ULL, 216089963474406ULL,
     198797423899182ULL, 183694689234641ULL, 170412218441933ULL, 158656968791122ULL,
@@ -88,7 +90,7 @@ static constexpr std::uint64_t recip_sqrt_k1s[90] = {
     16174194181058ULL, 16174194181058ULL
 };
 
-constexpr int table_size = 90;
+BOOST_DECIMAL_INLINE_CONSTEXPR_VARIABLE int table_size = 90;
 constexpr int table_scale = 16;  // values scaled by 10^16
 
 } // namespace sqrt_lookup
