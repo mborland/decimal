@@ -394,7 +394,8 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto parser(const char* first, const char* last, bo
     else if (*next == exp_char || *next == capital_exp_char)
     {
         // Would be a number without a significand e.g. e+03
-        if (next == first || fmt == chars_format::fixed)
+        // cohort_preserving_fixed has an implied exponent of zero, so an explicit exponent is not allowed
+        if (next == first || fmt == chars_format::fixed || fmt == chars_format::cohort_preserving_fixed)
         {
             return {next, std::errc::invalid_argument};
         }
