@@ -403,7 +403,7 @@ typedef unsigned __int128 builtin_uint128_t;
 
 #endif // Exceptions
 
-#ifndef BOOST_DECIMAL_BULID_MODULE
+#ifndef BOOST_DECIMAL_BUILD_MODULE
 #  include <cfloat>
 #  include <type_traits>
 #endif
