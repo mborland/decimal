@@ -41,6 +41,7 @@ module;
 #include <algorithm>
 #include <array>
 #include <bit>
+#include <cctype>
 #include <charconv>
 #include <compare>
 #include <complex>
@@ -65,7 +66,13 @@ module;
 #include <type_traits>
 #include <utility>
 
-// <stdfloat> is a C++23 feature that is not everywhere yet
+// <format> and <stdfloat> are newer library features that are not available on
+// every toolchain yet, so they are only pulled in when present. <format> uses the
+// same feature gate as format.hpp so it is supplied whenever that header needs it.
+#if __has_include(<format>) && defined(__cpp_lib_format) && __cpp_lib_format >= 201907L
+#  include <format>
+#endif
+
 #if __has_include(<stdfloat>)
 #  include <stdfloat>
 #endif
