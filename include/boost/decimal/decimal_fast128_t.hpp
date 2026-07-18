@@ -76,6 +76,9 @@ constexpr auto to_chars_hex_impl(char* first, char* last, const TargetDecimalTyp
 template <BOOST_DECIMAL_DECIMAL_FLOATING_TYPE TargetDecimalType>
 constexpr auto to_chars_cohort_preserving_scientific(char* first, char* last, const TargetDecimalType& value) noexcept -> to_chars_result;
 
+template <BOOST_DECIMAL_DECIMAL_FLOATING_TYPE TargetDecimalType>
+constexpr auto to_chars_cohort_preserving_fixed(char* first, char* last, const TargetDecimalType& value) noexcept -> to_chars_result;
+
 template <typename TargetDecimalType, bool is_snan>
 constexpr auto write_payload(typename TargetDecimalType::significand_type payload_value)
     BOOST_DECIMAL_REQUIRES(detail::is_fast_type_v, TargetDecimalType);
@@ -203,6 +206,9 @@ private:
 
     template <BOOST_DECIMAL_DECIMAL_FLOATING_TYPE TargetDecimalType>
     friend constexpr auto detail::to_chars_cohort_preserving_scientific(char* first, char* last, const TargetDecimalType& value) noexcept -> to_chars_result;
+
+    template <BOOST_DECIMAL_DECIMAL_FLOATING_TYPE TargetDecimalType>
+    friend constexpr auto detail::to_chars_cohort_preserving_fixed(char* first, char* last, const TargetDecimalType& value) noexcept -> to_chars_result;
 
     template <typename TargetDecimalType, bool is_snan>
     friend constexpr auto detail::write_payload(typename TargetDecimalType::significand_type payload_value)

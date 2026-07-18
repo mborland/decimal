@@ -223,6 +223,7 @@ run ../example/basic_construction.cpp ;
 run ../example/bit_conversions.cpp ;
 run ../example/charconv.cpp ;
 run ../example/charconv_cohort_preservation.cpp ;
+run ../example/charconv_cohort_preservation_fixed.cpp ;
 run ../example/literals.cpp ;
 run ../example/rounding_mode.cpp ;
 run ../example/rounding_mode_compile_time.cpp ;

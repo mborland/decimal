@@ -73,6 +73,9 @@ constexpr auto to_chars_hex_impl(char* first, char* last, const TargetDecimalTyp
 template <BOOST_DECIMAL_DECIMAL_FLOATING_TYPE TargetDecimalType>
 constexpr auto to_chars_cohort_preserving_scientific(char* first, char* last, const TargetDecimalType& value) noexcept -> to_chars_result;
 
+template <BOOST_DECIMAL_DECIMAL_FLOATING_TYPE TargetDecimalType>
+constexpr auto to_chars_cohort_preserving_fixed(char* first, char* last, const TargetDecimalType& value) noexcept -> to_chars_result;
+
 template <bool checked, BOOST_DECIMAL_DECIMAL_FLOATING_TYPE T>
 constexpr auto d64_fma_impl(T x, T y, T z) noexcept -> T;
 
@@ -212,6 +215,9 @@ private:
 
     template <BOOST_DECIMAL_DECIMAL_FLOATING_TYPE TargetDecimalType>
     friend constexpr auto detail::to_chars_cohort_preserving_scientific(char* first, char* last, const TargetDecimalType& value) noexcept -> to_chars_result;
+
+    template <BOOST_DECIMAL_DECIMAL_FLOATING_TYPE TargetDecimalType>
+    friend constexpr auto detail::to_chars_cohort_preserving_fixed(char* first, char* last, const TargetDecimalType& value) noexcept -> to_chars_result;
 
     template <bool checked, BOOST_DECIMAL_DECIMAL_FLOATING_TYPE T>
     friend constexpr auto detail::d64_fma_impl(T x, T y, T z) noexcept -> T;
