@@ -11,8 +11,11 @@
 #pragma GCC diagnostic ignored "-Wstringop-overflow"
 
 #include <algorithm>
+#include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cstdlib>
+#include <iterator>
 
 namespace crt
 {
