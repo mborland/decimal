@@ -89,3 +89,10 @@ Their usage closely resembles that of built-in binary floating point types by de
 # Full Documentation
 
 The complete documentation can be found at: https://www.boost.org/doc/libs/develop/libs/decimal/doc/html/overview.html
+
+# Help and feedback
+
+* **[GitHub Issues](https://github.com/boostorg/decimal/issues)** for bug reports. Search before opening a new one.
+* **[GitHub Discussions](https://github.com/boostorg/decimal/discussions)** for questions, design ideas, and general conversation about the library.
+* **[Boost mailing list](http://lists.boost.org/mailman/listinfo.cgi/boost-users)** for general Boost development. Use the `[decimal]` tag in the subject line.
+* **CppLang Slack** for real-time chat. [Request an invite](https://cppalliance.org/slack/), then join the `#boost` channel.
