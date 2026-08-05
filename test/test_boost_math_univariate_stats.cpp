@@ -9,11 +9,9 @@
 // Propogates up from boost.math
 #define _SILENCE_CXX23_DENORM_DEPRECATION_WARNING
 
-// Needed for operations with boost math
-#define BOOST_DECIMAL_ALLOW_IMPLICIT_INTEGER_CONVERSIONS
-
 #include <boost/decimal.hpp>
 
+// tag::exclude[]
 #if defined(__clang__)
 #  pragma clang diagnostic push
 #  pragma clang diagnostic ignored "-Wold-style-cast"
@@ -37,6 +35,7 @@
 #  pragma GCC diagnostic ignored "-Wfloat-equal"
 #  pragma GCC diagnostic ignored "-Wuseless-cast"
 #endif
+// end::exclude[]
 
 #include <vector>
 #include <array>
