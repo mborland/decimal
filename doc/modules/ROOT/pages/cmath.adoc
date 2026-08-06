@@ -606,9 +606,9 @@ namespace decimal {
 template <typename Decimal>
 constexpr int quantexp(Decimal x) noexcept;
 
-constexpr int quantexp32(decimal32_t x) noexcept;
-constexpr int quantexp64(decimal64_t x) noexcept;
-constexpr int quantexp128(decimal128_t x) noexcept;
+constexpr int quantexpd32(decimal32_t x) noexcept;
+constexpr int quantexpd64(decimal64_t x) noexcept;
+constexpr int quantexpd128(decimal128_t x) noexcept;
 
 } // namespace decimal
 } // namepsace boost
