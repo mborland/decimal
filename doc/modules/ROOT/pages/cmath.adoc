@@ -618,7 +618,7 @@ Effects: if x is finite, returns its quantum exponent.
 
 Otherwise, `INT_MIN` is returned.
 
-=== `quantized`
+=== `quantize`
 
 [source, c++]
 ----
@@ -628,11 +628,7 @@ namespace boost {
 namespace decimal {
 
 template <typename Decimal>
-constexpr Decimal quantized(Decimal x, Decimal y) noexcept;
-
-constexpr decimal32_t quantized32(decimal32_t x, decimal32_t y) noexcept;
-constexpr decimal64_t quantized64(decimal64_t x, decimal64_t y) noexcept;
-constexpr decimal128_t quantized128(decimal128_t x, decimal128_t y) noexcept;
+constexpr Decimal quantize(Decimal x, Decimal y) noexcept;
 
 } // namespace decimal
 } // namepsace boost
