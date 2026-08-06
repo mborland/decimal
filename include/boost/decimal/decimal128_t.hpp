@@ -2285,7 +2285,7 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto quantexpd128(const decimal128_t x) noexcept ->
     }
     #endif
 
-    return static_cast<int>(x.unbiased_exponent());
+    return static_cast<int>(x.biased_exponent());
 }
 
 BOOST_DECIMAL_CUDA_CONSTEXPR auto copysignd128(decimal128_t mag, const decimal128_t sgn) noexcept -> decimal128_t

@@ -1780,7 +1780,7 @@ constexpr auto quantexpd32f(const decimal_fast32_t x) noexcept -> int
     }
     #endif
 
-    return static_cast<int>(x.unbiased_exponent());
+    return static_cast<int>(x.biased_exponent());
 }
 
 #if !defined(BOOST_DECIMAL_DISABLE_CLIB)

@@ -1785,7 +1785,7 @@ constexpr auto quantexpd64f(const decimal_fast64_t x) noexcept -> int
     }
     #endif
 
-    return static_cast<int>(x.unbiased_exponent());
+    return static_cast<int>(x.biased_exponent());
 }
 
 constexpr auto scalblnd64f(decimal_fast64_t num, const long exp) noexcept -> decimal_fast64_t
