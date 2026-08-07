@@ -290,6 +290,11 @@ void test_nonfinite_quantize()
                               std::numeric_limits<Dec>::infinity() * dist(rng))));
 }
 
+// The fast types are absent from every test below on purpose. They normalize on
+// construction so they have no cohorts, and samequantum, quantexp, and quantize are all
+// rejected for them at compile time. See test_illegal_fast_samequantum.cpp,
+// test_illegal_fast_quantexp.cpp, and test_illegal_fast_quantize.cpp, and use rescale to
+// round a fast type to a fixed number of fractional digits.
 int main()
 {
     test_same_quantum<decimal32_t>();
