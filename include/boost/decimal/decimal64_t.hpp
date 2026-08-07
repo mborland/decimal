@@ -2322,7 +2322,7 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto quantexpd64(const decimal64_t x) noexcept -> i
     }
     #endif
 
-    return static_cast<int>(x.biased_exponent());
+    return x.biased_exponent();
 }
 
 BOOST_DECIMAL_CUDA_CONSTEXPR auto scalblnd64(decimal64_t num, const long exp) noexcept -> decimal64_t
