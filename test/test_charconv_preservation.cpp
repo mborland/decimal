@@ -386,6 +386,53 @@ void test_scientific_exponent_ceiling()
     BOOST_TEST(bad_r.ec == std::errc::value_too_large);
 }
 
+// A significand of two or more digits is split after the leading digit. A significand of
+// exactly 10 is the boundary case, and must render as 1.0e+xx rather than 10e+xx.
+template <typename T>
+void test_leading_digit_split()
+{
+    const T values[] {T{9U, 0, false}, T{10U, 0, false}, T{11U, 0, false}, T{10U, -3, false}, T{10U, 3, false}, T{10U, 0, true}};
+    const char* const expected[] {"9e+00", "1.0e+01", "1.1e+01", "1.0e-02", "1.0e+04", "-1.0e+01"};
+
+    for (std::size_t i {}; i < sizeof(values) / sizeof(values[0]); ++i)
+    {
+        char buffer[64] {};
+        const auto r {to_chars(buffer, buffer + sizeof(buffer), values[i], chars_format::cohort_preserving_scientific)};
+        BOOST_TEST(r);
+        *r.ptr = '\0';
+        BOOST_TEST_CSTR_EQ(buffer, expected[i]);
+
+        T restored;
+        const auto back {from_chars(buffer, r.ptr, restored, chars_format::cohort_preserving_scientific)};
+        BOOST_TEST(back);
+        BOOST_TEST(std::memcmp(&values[i], &restored, sizeof(T)) == 0);
+    }
+}
+
+// Cohorts do not apply to non-finite values, but the sign still does
+template <typename T>
+void test_nonfinite_sign()
+{
+    const T values[] {std::numeric_limits<T>::infinity(),
+                      -std::numeric_limits<T>::infinity(),
+                      std::numeric_limits<T>::quiet_NaN(),
+                      -std::numeric_limits<T>::quiet_NaN()};
+
+    const char* const expected[] {"inf", "-inf", "nan", "-nan(ind)"};
+
+    for (const auto fmt : {chars_format::cohort_preserving_scientific, chars_format::cohort_preserving_fixed})
+    {
+        for (std::size_t i {}; i < sizeof(values) / sizeof(values[0]); ++i)
+        {
+            char buffer[64] {};
+            const auto r {to_chars(buffer, buffer + sizeof(buffer), values[i], fmt)};
+            BOOST_TEST(r);
+            *r.ptr = '\0';
+            BOOST_TEST_CSTR_EQ(buffer, expected[i]);
+        }
+    }
+}
+
 int main()
 {
     test_to_chars_scientific(decimals<decimal32_t>, strings);
@@ -477,6 +524,14 @@ int main()
     test_fixed_exponent_floor<decimal64_t>(398);
     test_fixed_exponent_floor<decimal128_t>(6176);
     test_scientific_exponent_ceiling();
+
+    test_leading_digit_split<decimal32_t>();
+    test_leading_digit_split<decimal64_t>();
+    test_leading_digit_split<decimal128_t>();
+
+    test_nonfinite_sign<decimal32_t>();
+    test_nonfinite_sign<decimal64_t>();
+    test_nonfinite_sign<decimal128_t>();
 
     return boost::report_errors();
 }
