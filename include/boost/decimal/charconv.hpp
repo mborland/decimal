@@ -1073,7 +1073,12 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto to_chars_cohort_preserving_scientific(char* fi
     const auto fp = fpclassify(value);
     if (!(fp == FP_NORMAL || fp == FP_SUBNORMAL || fp == FP_ZERO))
     {
-        // Cohorts are irrelevant for non-finite values
+        // Cohorts are irrelevant for non-finite values, but the sign is still significant
+        if (signbit(value))
+        {
+            *first++ = '-';
+        }
+
         return to_chars_nonfinite(first, last, value, fp, chars_format::scientific, -1);
     }
 
@@ -1090,7 +1095,8 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto to_chars_cohort_preserving_scientific(char* fi
         *first++ = '-';
     }
 
-    const bool fractional_piece {significand > 10U};
+    // Any significand of two or more digits gets a decimal point after the leading digit
+    const bool fractional_piece {significand >= 10U};
     const auto r {to_chars_integer_impl<unsigned_integer>(first + static_cast<std::ptrdiff_t>(fractional_piece), last, significand)};
 
     if (BOOST_DECIMAL_UNLIKELY(!r))
@@ -1142,7 +1148,12 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto to_chars_cohort_preserving_fixed(char* first, 
     const auto fp = fpclassify(value);
     if (!(fp == FP_NORMAL || fp == FP_SUBNORMAL || fp == FP_ZERO))
     {
-        // Cohorts are irrelevant for non-finite values
+        // Cohorts are irrelevant for non-finite values, but the sign is still significant
+        if (signbit(value))
+        {
+            *first++ = '-';
+        }
+
         return to_chars_nonfinite(first, last, value, fp, chars_format::fixed, -1);
     }
 
