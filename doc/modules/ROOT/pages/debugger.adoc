@@ -11,6 +11,7 @@ https://www.boost.org/LICENSE_1_0.txt
 Currently, Boost.Decimal supports pretty printing with LLDB, GDB, and the Visual Studio debugger.
 All three produce the same text for a given value.
 
+[#debug_lldb]
 == LLDB
 
 To load the pretty printer, add the following line to your `.lldbinit`:
@@ -20,6 +21,7 @@ To load the pretty printer, add the following line to your `.lldbinit`:
 command script import /path/to/decimal/extra/decimal_printer_lldb.py
 ----
 
+[#debug_gdb]
 == GDB
 
 To load the pretty printer, add the following line to your `.gdbinit`:
@@ -36,6 +38,7 @@ or you can source it manually in GDB:
 (gdb) source /path/to/decimal/extra/decimal_printer_gdb.py
 ----
 
+[#debug_natvis]
 == Visual Studio (NATVIS)
 
 A decimal encoding can not be decoded by the NATVIS expression evaluator on its own, so the
