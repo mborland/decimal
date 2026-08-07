@@ -2410,7 +2410,7 @@ constexpr auto quantexpd32(const decimal32_t x) noexcept -> int
     }
     #endif
 
-    return static_cast<int>(x.unbiased_exponent());
+    return x.biased_exponent();
 }
 
 constexpr auto scalblnd32(decimal32_t num, const long exp) noexcept -> decimal32_t

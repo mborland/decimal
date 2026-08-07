@@ -84,6 +84,8 @@ void test_same_quantum()
     }
 }
 
+// quantexp returns the quantum exponent, not the biased encoded exponent field,
+// so the IEEE types report back exactly the exponent they were constructed with.
 template <typename Dec>
 void test_quantexp()
 {
@@ -98,7 +100,7 @@ void test_quantexp()
         }
         else
         {
-            if (!BOOST_TEST_EQ(quantexp(val1), i + detail::bias_v<Dec>))
+            if (!BOOST_TEST_EQ(quantexp(val1), i))
             // LCOV_EXCL_START
             {
                 std::cerr << "Val: " << val1
@@ -106,6 +108,85 @@ void test_quantexp()
             }
             // LCOV_EXCL_STOP
         }
+    }
+}
+
+// The fast types renormalize the significand to full precision in their
+// constructor, so {1, i} is stored as 10^(digits10 - 1) scaled by
+// 10^(i - digits10 + 1), which is the quantum exponent quantexp must report.
+template <typename Dec>
+void test_quantexp_fast()
+{
+    constexpr auto digits {std::numeric_limits<Dec>::digits10};
+
+    for (auto i {std::numeric_limits<Dec>::min_exponent10 + digits}; i < std::numeric_limits<Dec>::max_exponent10 - digits; ++i)
+    {
+        const Dec val1 {1, i};
+
+        if (isinf(val1))
+        {
+            continue; // LCOV_EXCL_LINE
+        }
+
+        if (!BOOST_TEST_EQ(quantexp(val1), i - digits + 1))
+        // LCOV_EXCL_START
+        {
+            std::cerr << "Val: " << val1
+                      << "\nExp 1: " << i << std::endl;
+        }
+        // LCOV_EXCL_STOP
+
+        // frexp10 does not renormalize the fast types, so its exponent is an
+        // independent view of the same quantum exponent.
+        int frexp_exp {};
+        static_cast<void>(frexp10(val1, &frexp_exp));
+        BOOST_TEST_EQ(quantexp(val1), frexp_exp);
+    }
+}
+
+// Spot values from the bug report that the biased return value got wrong.
+// The IEEE types preserve the quantum they were constructed with.
+template <typename Dec>
+void test_quantexp_spot()
+{
+    BOOST_TEST_EQ(quantexp(Dec {3, 2}), 2);
+    BOOST_TEST_EQ(quantexp(Dec {3000000, -4}), -4);
+    BOOST_TEST_EQ(quantexp(Dec {5, 0}), 0);
+
+    // The quantum exponent belongs to the cohort member, not to the value, so
+    // two equal values with different quanta report different exponents.
+    BOOST_TEST((Dec {3, 2} == Dec {3000000, -4}));
+    BOOST_TEST_NE(quantexp(Dec {3, 2}), quantexp(Dec {3000000, -4}));
+}
+
+// samequantum compares two exponents, so it is immune to a uniform bias offset.
+// Holding it against quantexp pins the two functions to the same definition
+// for both the IEEE and the fast families.
+template <typename Dec>
+void test_quantexp_samequantum_agreement()
+{
+    std::uniform_int_distribution<std::int64_t> sig(1, 9'999'999);
+    std::uniform_int_distribution<std::int32_t> exp(std::numeric_limits<Dec>::min_exponent10 + 19,
+                                                    std::numeric_limits<Dec>::max_exponent10 - 19);
+
+    constexpr auto max_iter {std::is_same<Dec, decimal128_t>::value ? N / 4 : N};
+    for (std::size_t i {}; i < max_iter; ++i)
+    {
+        const Dec val1 {sig(rng), exp(rng)};
+        const Dec val2 {sig(rng), exp(rng)};
+
+        if (!isfinite(val1) || !isfinite(val2))
+        {
+            continue; // LCOV_EXCL_LINE
+        }
+
+        if (!BOOST_TEST_EQ(samequantum(val1, val2), quantexp(val1) == quantexp(val2)))
+        // LCOV_EXCL_START
+        {
+            std::cerr << "Val 1: " << val1
+                      << "\nVal 2: " << val2 << std::endl;
+        }
+        // LCOV_EXCL_STOP
     }
 }
 
@@ -214,6 +295,8 @@ int main()
     test_same_quantum<decimal32_t>();
     test_nonfinite_samequantum<decimal32_t>();
     test_quantexp<decimal32_t>();
+    test_quantexp_spot<decimal32_t>();
+    test_quantexp_samequantum_agreement<decimal32_t>();
     test_nonfinite_quantexp<decimal32_t>();
     test_quantize<decimal32_t>();
     test_quantize_spot<decimal32_t>();
@@ -223,7 +306,9 @@ int main()
     test_nonfinite_samequantum<decimal_fast32_t>();
     // decimal_fast32_t normalizes its value in the constructor,
     // so it will not match the values of the other types
-    //test_quantexp<decimal_fast32_t>();
+    test_quantexp_fast<decimal_fast32_t>();
+    test_quantexp_samequantum_agreement<decimal_fast32_t>();
+    BOOST_TEST_EQ(quantexp(decimal_fast32_t {3, 2}), -4);
     test_nonfinite_quantexp<decimal_fast32_t>();
     test_quantize<decimal_fast32_t>();
     // The fast types renormalize the significand to full precision in their
@@ -234,6 +319,8 @@ int main()
     test_same_quantum<decimal64_t>();
     test_nonfinite_samequantum<decimal64_t>();
     test_quantexp<decimal64_t>();
+    test_quantexp_spot<decimal64_t>();
+    test_quantexp_samequantum_agreement<decimal64_t>();
     test_nonfinite_quantexp<decimal64_t>();
     test_quantize<decimal64_t>();
     test_quantize_spot<decimal64_t>();
@@ -243,7 +330,8 @@ int main()
     test_nonfinite_samequantum<decimal_fast64_t>();
     // decimal_fast64_t normalizes its value in the constructor,
     // so it will not match the values of the other types
-    //test_quantexp<decimal_fast64_t>();
+    test_quantexp_fast<decimal_fast64_t>();
+    test_quantexp_samequantum_agreement<decimal_fast64_t>();
     test_nonfinite_quantexp<decimal_fast64_t>();
     test_quantize<decimal_fast64_t>();
     // The fast types renormalize the significand to full precision in their
@@ -254,10 +342,18 @@ int main()
     test_same_quantum<decimal128_t>();
     test_nonfinite_samequantum<decimal128_t>();
     test_quantexp<decimal128_t>();
+    test_quantexp_spot<decimal128_t>();
+    test_quantexp_samequantum_agreement<decimal128_t>();
     test_nonfinite_quantexp<decimal128_t>();
     test_quantize<decimal128_t>();
     test_quantize_spot<decimal128_t>();
     test_nonfinite_quantize<decimal128_t>();
+
+    // decimal_fast128_t normalizes its value in the constructor,
+    // so it will not match the values of the other types
+    test_quantexp_fast<decimal_fast128_t>();
+    test_quantexp_samequantum_agreement<decimal_fast128_t>();
+    test_nonfinite_quantexp<decimal_fast128_t>();
 
     return boost::report_errors();
 }
