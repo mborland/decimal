@@ -594,6 +594,9 @@ If both x and y are NaN, or infinity, they have the same quantum exponents.
 
 If exactly one operand is infinity or exactly one operand is NaN, they do not have the same quantum exponents.
 
+WARNING: This operation is defined in terms of cohorts, which the fast types do not have, so calling it with `decimal_fast32_t`, `decimal_fast64_t`, or `decimal_fast128_t` is a compile error.
+See the xref:fast_types.adoc#fast_types_limitations[fast type limitations].
+
 === `quantexp`
 
 [source, c++]
@@ -617,6 +620,9 @@ constexpr int quantexpd128(decimal128_t x) noexcept;
 Effects: if x is finite, returns its quantum exponent.
 
 Otherwise, `INT_MIN` is returned.
+
+WARNING: This operation is defined in terms of cohorts, which the fast types do not have, so calling it with `decimal_fast32_t`, `decimal_fast64_t`, or `decimal_fast128_t` is a compile error.
+See the xref:fast_types.adoc#fast_types_limitations[fast type limitations].
 
 === `quantize`
 
@@ -649,6 +655,11 @@ Otherwise, if only one operand is infinity, the "invalid" floating-point excepti
 If both operands are infinity, the result is infinity, with the same sign as x.
 
 The quantize functions do not signal underflow.
+
+WARNING: This operation is defined in terms of cohorts, which the fast types do not have, so calling it with `decimal_fast32_t`, `decimal_fast64_t`, or `decimal_fast128_t` is a compile error.
+Because those types normalize on construction, `y` cannot carry the exponent it was built with, so the operation cannot do what its definition promises.
+See the xref:fast_types.adoc#fast_types_limitations[fast type limitations].
+To round to a fixed number of fractional digits on any type, use xref:#cmath_rescale[`rescale`] instead.
 
 === `decompose`
 [source, c++]
@@ -781,8 +792,16 @@ constexpr Decimal rescale(Decimal val, int precision = 0);
 } // namespace boost
 ----
 
-The function returns the decimal type with number of fractional digits equal to the value of precision.
-`rescale` is similar to https://en.cppreference.com/w/cpp/numeric/math/trunc[trunc], and with the default precision argument of 0 it is identical.
+The function returns `val` rounded to `precision` digits after the decimal point, using the active rounding mode.
+So `rescale(123.456789, 2)` returns `123.46`, and `rescale(123.456789, 4)` returns `123.4568`.
+
+A negative `precision` rounds to the corresponding power of ten, so `rescale(123.456789, -1)` returns `120` and `rescale(123.456789, -2)` returns `100`.
+
+If `val` already has no more than `precision` fractional digits then it is returned unchanged, so `rescale(123.456789, 8)` returns `123.456789`.
+NaN, infinity, and zero are also returned unmodified, which means `rescale` never returns NaN for a finite input.
+`precision` is saturated to the range of quantum exponents the format is able to encode.
+
+NOTE: Unlike https://en.cppreference.com/w/cpp/numeric/math/trunc[trunc], `rescale` rounds rather than truncates. With the default `precision` of 0 it rounds to an integer using the active rounding mode, which by default is to nearest with ties to even, so `rescale(123.9)` returns `124`.
 
 NOTE: This function was previously known as `trunc_to` which was deprecated in v5.0.0 and removed in v6.0.0
 
