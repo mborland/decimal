@@ -5,7 +5,7 @@ https://www.boost.org/LICENSE_1_0.txt
 ////
 
 [#bin_float]
-= Conversion from Binary Floating Point
+= Conversion from and Operations with Binary Floating Point
 :idprefix: bin_float_
 
 The library deliberately does not contain any operations between a binary floating point type and the decimal floating point types.
