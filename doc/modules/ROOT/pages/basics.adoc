@@ -77,6 +77,7 @@ boost::decimal::decimal128_t pi {3.14};
 
 Construction from non-finite values (e.g. `std::numeric_limits<double>::quiet_NaN()`) will yield the same non-finite value in the resulting decimal value.
 Overflow or underflow will construct infinity or 0.
+For additional information please see: xref:binary_floating_conversions.adoc[].
 
 IMPORTANT: Due to the differences in decimal and binary floating point numbers there may be a difference in the resulting representation in decimal format, and thus it is not recommended to construct from binary floating point numbers
 
