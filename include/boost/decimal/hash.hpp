@@ -19,6 +19,39 @@
 #include <cstring>
 #endif
 
+namespace boost {
+namespace decimal {
+namespace detail {
+
+// std::hash requires that values which compare equal hash equally. Two things that do not
+// take part in equality have to be removed first: the members of a cohort, which normalize
+// collapses onto one representative, and the sign of a zero, since +0 == -0.
+template <typename DecimalType>
+auto hash_representative(const DecimalType& v) noexcept -> DecimalType
+{
+    // A non-finite value has no cohort and no significand to normalize, and normalizing one
+    // would fold every infinity and NaN onto the same arbitrary finite representative
+    #ifndef BOOST_DECIMAL_FAST_MATH
+    if (!isfinite(v))
+    {
+        return v;
+    }
+    #endif
+
+    const auto normalized_v {boost::decimal::normalize(v)};
+
+    if (normalized_v == DecimalType{0, 0})
+    {
+        return DecimalType{0, 0};
+    }
+
+    return normalized_v;
+}
+
+} // namespace detail
+} // namespace decimal
+} // namespace boost
+
 namespace std {
 
 template <>
@@ -27,7 +60,7 @@ struct hash<boost::decimal::decimal32_t>
     // Since the underlying type is a std::uint32_t, we will rely on its hash function from the STL
     auto operator()(const boost::decimal::decimal32_t& v) const noexcept -> std::size_t
     {
-        const auto normalized_v {boost::decimal::normalize(v)};
+        const auto normalized_v {boost::decimal::detail::hash_representative(v)};
 
         std::uint32_t bits;
         std::memcpy(&bits, &normalized_v, sizeof(std::uint32_t));
@@ -42,7 +75,7 @@ struct hash<boost::decimal::decimal64_t>
     // Since the underlying type is a std::uint64_t, we will rely on its hash function from the STL
     auto operator()(const boost::decimal::decimal64_t& v) const noexcept -> std::size_t
     {
-        const auto normalized_v {boost::decimal::normalize(v)};
+        const auto normalized_v {boost::decimal::detail::hash_representative(v)};
 
         std::uint64_t bits;
         std::memcpy(&bits, &normalized_v, sizeof(std::uint64_t));
@@ -62,7 +95,7 @@ struct hash<boost::decimal::decimal128_t>
     // Take the xor of the two words and hash that
     auto operator()(const boost::decimal::decimal128_t& v) const noexcept -> std::size_t
     {
-        const auto normalized_v {boost::decimal::normalize(v)};
+        const auto normalized_v {boost::decimal::detail::hash_representative(v)};
 
         boost::int128::uint128_t bits;
         std::memcpy(&bits, &normalized_v, sizeof(boost::int128::uint128_t));
@@ -81,7 +114,7 @@ struct hash<boost::decimal::decimal_fast32_t>
     // Need to convert into decimal32_t then apply our memcpy
     auto operator()(const boost::decimal::decimal_fast32_t& v) const noexcept -> std::size_t
     {
-        boost::decimal::decimal32_t v_32 {v};
+        const auto v_32 {boost::decimal::detail::hash_representative(boost::decimal::decimal32_t{v})};
         std::uint32_t bits;
         std::memcpy(&bits, &v_32, sizeof(std::uint32_t));
 
@@ -96,7 +129,7 @@ struct hash<boost::decimal::decimal_fast64_t>
     // First we convert to a decimal64_t, so they will have the same hash value
     auto operator()(const boost::decimal::decimal_fast64_t& v) const noexcept -> std::size_t
     {
-        boost::decimal::decimal64_t v_64 {v};
+        const auto v_64 {boost::decimal::detail::hash_representative(boost::decimal::decimal64_t{v})};
         std::uint64_t bits;
         std::memcpy(&bits, &v_64, sizeof(std::uint64_t));
 
@@ -115,7 +148,7 @@ struct hash<boost::decimal::decimal_fast128_t>
     // Take the xor of the two words and hash that
     auto operator()(const boost::decimal::decimal_fast128_t& v) const noexcept -> std::size_t
     {
-        boost::decimal::decimal128_t v_128 {v};
+        const auto v_128 {boost::decimal::detail::hash_representative(boost::decimal::decimal128_t{v})};
         boost::int128::uint128_t bits;
         std::memcpy(&bits, &v_128, sizeof(boost::int128::uint128_t));
 
