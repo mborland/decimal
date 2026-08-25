@@ -536,7 +536,7 @@ jobs:
           #  addrmd: "32"
           #  os: windows-2022
           - toolset: msvc-14.3
-            cxxstd: "14,17,20,latest"
+            cxxstd: "14,latest"
             addrmd: "64"
             os: windows-2022
           - toolset: clang-win
