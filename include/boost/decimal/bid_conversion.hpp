@@ -28,8 +28,26 @@ BOOST_DECIMAL_EXPORT BOOST_DECIMAL_CUDA_CONSTEXPR auto to_bid_d32(const decimal3
     return val.bits_;
 }
 
+// IEEE 754-2008 3.5.2: a binary integer significand encoding whose coefficient is larger
+// than the format can hold is non canonical, and represents zero with the sign and the
+// quantum exponent that it does encode. Only the 11 steering form can carry such a
+// coefficient here, since the other form holds 23 bits and 2^23 - 1 is below 9'999'999.
 BOOST_DECIMAL_EXPORT BOOST_DECIMAL_CUDA_CONSTEXPR auto from_bid_d32(const std::uint32_t bits) noexcept -> decimal32_t
 {
+    if ((bits & detail::d32_inf_mask) != detail::d32_inf_mask &&
+        (bits & detail::d32_comb_11_mask) == detail::d32_comb_11_mask)
+    {
+        constexpr std::uint32_t implied_bit {UINT32_C(0x800000)};
+        const std::uint32_t significand {implied_bit | (bits & detail::d32_11_significand_mask)};
+
+        if (significand > detail::d32_max_significand_value)
+        {
+            const auto biased_exp {(bits & detail::d32_11_exp_mask) >> detail::d32_11_exp_shift};
+            const auto exp {static_cast<int>(biased_exp) - static_cast<int>(detail::bias_v<decimal32_t>)};
+            return decimal32_t {UINT32_C(0), exp, (bits & detail::d32_sign_mask) != UINT32_C(0)};
+        }
+    }
+
     return from_bits(bits);
 }
 
@@ -51,8 +69,24 @@ BOOST_DECIMAL_EXPORT BOOST_DECIMAL_CUDA_CONSTEXPR auto to_bid_d64(const decimal6
     return val.bits_;
 }
 
+// As above: 2^53 - 1 is below 9'999'999'999'999'999, so only the 11 steering form can
+// encode an out of range coefficient
 BOOST_DECIMAL_EXPORT BOOST_DECIMAL_CUDA_CONSTEXPR auto from_bid_d64(const std::uint64_t bits) noexcept -> decimal64_t
 {
+    if ((bits & detail::d64_inf_mask) != detail::d64_inf_mask &&
+        (bits & detail::d64_combination_field_mask) == detail::d64_combination_field_mask)
+    {
+        constexpr std::uint64_t implied_bit {UINT64_C(0x20000000000000)};
+        const std::uint64_t significand {implied_bit | (bits & detail::d64_11_significand_mask)};
+
+        if (significand > detail::d64_max_significand_value)
+        {
+            const auto biased_exp {(bits & detail::d64_11_exp_mask) >> detail::d64_11_exp_shift};
+            const auto exp {static_cast<int>(biased_exp) - static_cast<int>(detail::bias_v<decimal64_t>)};
+            return decimal64_t {UINT64_C(0), exp, (bits & detail::d64_sign_mask) != UINT64_C(0)};
+        }
+    }
+
     return from_bits(bits);
 }
 
@@ -74,15 +108,35 @@ BOOST_DECIMAL_EXPORT BOOST_DECIMAL_CUDA_CONSTEXPR auto to_bid_d128(const decimal
     return val.bits_;
 }
 
+// Unlike the narrower formats, decimal128 can encode an out of range coefficient from
+// either steering form: the wider form holds 113 bits and 2^113 - 1 is above 10^34 - 1,
+// while the 11 form starts at 2^113 and so is never canonical
 BOOST_DECIMAL_EXPORT BOOST_DECIMAL_CUDA_CONSTEXPR auto from_bid_d128(const int128::uint128_t bits) noexcept -> decimal128_t
 {
+    if ((bits.high & detail::d128_inf_mask.high) != detail::d128_inf_mask.high)
+    {
+        const bool comb_11 {(bits.high & detail::d128_combination_field_mask) == detail::d128_combination_field_mask};
+
+        constexpr int128::uint128_t implied_bit {UINT64_C(0x2000000000000), 0};
+        const auto significand {comb_11 ? (implied_bit | (bits & detail::d128_11_significand_mask))
+                                        : (bits & detail::d128_not_11_significand_mask)};
+
+        if (significand > detail::d128_max_significand_value)
+        {
+            const auto biased_exp {comb_11 ? ((bits.high & detail::d128_11_exp_mask) >> detail::d128_11_exp_high_word_shift)
+                                           : ((bits.high & detail::d128_not_11_exp_mask) >> detail::d128_not_11_exp_high_word_shift)};
+            const auto exp {static_cast<int>(biased_exp) - static_cast<int>(detail::bias_v<decimal128_t>)};
+            return decimal128_t {int128::uint128_t{0, 0}, exp, (bits.high & detail::d128_sign_mask) != UINT64_C(0)};
+        }
+    }
+
     return from_bits(bits);
 }
 
 #ifdef BOOST_DECIMAL_HAS_INT128
 BOOST_DECIMAL_EXPORT BOOST_DECIMAL_CUDA_CONSTEXPR auto from_bid_d128(const detail::builtin_uint128_t bits) noexcept -> decimal128_t
 {
-    return from_bits(bits);
+    return from_bid_d128(int128::uint128_t{bits});
 }
 #endif
 

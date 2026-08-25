@@ -1036,8 +1036,9 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto isfinite BOOST_DECIMAL_PREVENT_MACRO_SUBSTITUT
     #ifndef BOOST_DECIMAL_FAST_MATH
     return ((rhs.bits_ & detail::d32_inf_mask) != detail::d32_inf_mask);
     #else
+    // Under fast math there are no non-finite values, so every value is finite
     static_cast<void>(rhs);
-    return false;
+    return true;
     #endif
 }
 
