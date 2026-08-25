@@ -189,7 +189,9 @@ void test_classification()
         BOOST_TEST(!isinf(val));
         BOOST_TEST(!isnan(val));
         BOOST_TEST(!issignaling(val));
-        BOOST_TEST_EQ(isfinite(val), isfinite<T>(val));
+        // Qualified, because the explicit template argument form would otherwise also
+        // match the global isfinite template that the MSVC UCRT declares
+        BOOST_TEST_EQ(isfinite(val), boost::decimal::isfinite<T>(val));
 
         const auto classification {fpclassify(val)};
         BOOST_TEST(classification != FP_INFINITE);
