@@ -17,6 +17,7 @@
 #ifndef BOOST_DECIMAL_BUILD_MODULE
 #include <functional>
 #include <cstring>
+#include <cstdint>
 #endif
 
 namespace boost {
@@ -46,6 +47,23 @@ auto hash_representative(const DecimalType& v) noexcept -> DecimalType
     }
 
     return normalized_v;
+}
+
+// Narrows a 64-bit encoding down to a hash value
+inline auto hash_encoding(const std::uint64_t bits) noexcept -> std::size_t
+{
+    #ifdef BOOST_DECIMAL_HAS_32_BIT_SIZE_T
+
+    // std::hash<std::uint64_t> is a plain cast in libstdc++, so here it would keep only the
+    // low word. Every member of the zero cohort, every infinity and every NaN has a zero
+    // low word, so all of them would land in one bucket. Fold the high word in first.
+    return std::hash<std::uint64_t>{}(bits ^ (bits >> 32U));
+
+    #else
+
+    return std::hash<std::uint64_t>{}(bits);
+
+    #endif
 }
 
 } // namespace detail
@@ -80,7 +98,7 @@ struct hash<boost::decimal::decimal64_t>
         std::uint64_t bits;
         std::memcpy(&bits, &normalized_v, sizeof(std::uint64_t));
 
-        return std::hash<std::uint64_t>{}(bits);
+        return boost::decimal::detail::hash_encoding(bits);
     }
 };
 
@@ -100,7 +118,7 @@ struct hash<boost::decimal::decimal128_t>
         boost::int128::uint128_t bits;
         std::memcpy(&bits, &normalized_v, sizeof(boost::int128::uint128_t));
 
-        return std::hash<std::uint64_t>{}(bits.high ^ bits.low);
+        return boost::decimal::detail::hash_encoding(bits.high ^ bits.low);
     }
 };
 
@@ -133,7 +151,7 @@ struct hash<boost::decimal::decimal_fast64_t>
         std::uint64_t bits;
         std::memcpy(&bits, &v_64, sizeof(std::uint64_t));
 
-        return std::hash<std::uint64_t>{}(bits);
+        return boost::decimal::detail::hash_encoding(bits);
     }
 };
 
@@ -152,7 +170,7 @@ struct hash<boost::decimal::decimal_fast128_t>
         boost::int128::uint128_t bits;
         std::memcpy(&bits, &v_128, sizeof(boost::int128::uint128_t));
 
-        return std::hash<std::uint64_t>{}(bits.high ^ bits.low);
+        return boost::decimal::detail::hash_encoding(bits.high ^ bits.low);
     }
 };
 

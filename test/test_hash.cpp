@@ -196,6 +196,39 @@ void test_all()
     test_unordered_containers<T>();
 }
 
+// detail::hash_encoding has to keep encodings apart at whatever width std::size_t is.
+// Every zero encoding, every infinity and every NaN has a zero low word, so where size_t
+// is 32 bits and std::hash<std::uint64_t> is a truncating cast they would otherwise all
+// share a bucket.
+void test_encoding_fold()
+{
+    const std::uint64_t encodings[] {
+        UINT64_C(0x31C0000000000000),   // decimal64_t zero
+        UINT64_C(0x7800000000000000),   // positive infinity
+        UINT64_C(0xF800000000000000),   // negative infinity
+        UINT64_C(0x7C00000000000000),   // quiet NaN
+        UINT64_C(0x7E00000000000000),   // signaling NaN
+        UINT64_C(0x3040000000000000)    // decimal128_t zero, high word
+    };
+
+    constexpr std::size_t count {sizeof(encodings) / sizeof(encodings[0])};
+
+    for (std::size_t i {}; i < count; ++i)
+    {
+        for (std::size_t j {i + 1}; j < count; ++j)
+        {
+            const auto lhs {boost::decimal::detail::hash_encoding(encodings[i])};
+            const auto rhs {boost::decimal::detail::hash_encoding(encodings[j])};
+
+            if (!BOOST_TEST_NE(lhs, rhs))
+            {
+                std::cerr << "Encodings collide once narrowed to std::size_t: index "
+                          << i << " and " << j << std::endl;
+            }
+        }
+    }
+}
+
 int main()
 {
     test_all<boost::decimal::decimal32_t>();
@@ -204,6 +237,8 @@ int main()
     test_all<boost::decimal::decimal_fast32_t>();
     test_all<boost::decimal::decimal_fast64_t>();
     test_all<boost::decimal::decimal_fast128_t>();
+
+    test_encoding_fold();
 
     return boost::report_errors();
 }
