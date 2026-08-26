@@ -806,6 +806,26 @@ BOOST_DECIMAL_CUDA_CONSTEXPR decimal32_t::decimal32_t(T1 coeff, T2 exp, const de
             reduced_coeff *= detail::pow10(static_cast<significand_type>(offset));
             *this = detail::pack_in_range<decimal32_t>(reduced_coeff, exp, is_negative);
         }
+        else if (biased_exp > detail::max_biased_exp_v<decimal32_t>)
+        {
+            // The quantum exponent is past the maximum, but the value itself is still
+            // representable whenever the coefficient has room to absorb the excess.
+            // Fold the overflow into the coefficient rather than returning infinity.
+            const auto available_space {detail::precision - coeff_digits};
+            if (available_space >= exp_delta)
+            {
+                // With available_space >= exp_delta the exponent lands in [0, max] and the
+                // coefficient keeps at most precision digits, so pack_in_range applies
+                reduced_coeff *= detail::pow10(static_cast<significand_type>(available_space));
+                exp -= available_space;
+                *this = detail::pack_in_range<decimal32_t>(reduced_coeff, exp, is_negative);
+            }
+            else
+            {
+                bits_ = detail::d32_inf_mask;
+                bits_ |= is_negative ? detail::d32_sign_mask : UINT32_C(0);
+            }
+        }
         else
         {
             // Reset the value and make sure to preserve the sign of 0/inf
@@ -1036,8 +1056,9 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto isfinite BOOST_DECIMAL_PREVENT_MACRO_SUBSTITUT
     #ifndef BOOST_DECIMAL_FAST_MATH
     return ((rhs.bits_ & detail::d32_inf_mask) != detail::d32_inf_mask);
     #else
+    // Under fast math there are no non-finite values, so every value is finite
     static_cast<void>(rhs);
-    return false;
+    return true;
     #endif
 }
 
