@@ -114,32 +114,13 @@ There is a JOSS paper — full citation at the end.
 
 [.build-lists: false]
 
-# Where we are going
+# Part 1 of 5
 
 1. Inside the bits
-2. The library
-3. In action
-4. The trade
-5. Performance
-6. When to reach for it
-
-^ The map arrives after the hook, never before it.
-^
-^ Twenty seconds. Do not read all six aloud — "six parts, and the first one
-^ is the part nobody ever gave you." Move.
-
----
-
-[.build-lists: false]
-
-# Part 1 of 6
-
-1. **Inside the bits**
-2. The library
-3. In action
-4. The trade
-5. Performance
-6. When to reach for it
+2. **The Types**
+3. The Standard Library
+4. Performance
+5. When to reach for it
 
 ^ "This is the introduction to decimal floating point that most C++
 ^ programmers never got."
@@ -390,136 +371,15 @@ This is among the most expensive parts of these operations.
 
 ---
 
-# [fit] Rounding
-
-^ Short divider, or run the next two straight — your call on the clock.
-
----
-
-[.build-lists: true]
-
-# Binary Floating Point Rounding
-
-In `<cfenv>` we have the following four macros useable with `std::fesetround()`:
-
-1. `FE_DOWNWARD` - Rounding towards negative infinity 
-2. `FE_TONEAREST` - Rounding towards nearest representable value
-3. `FE_TOWARDZERO`- Rounding towards zero
-4. `FE_UPWARD` - Rounding towards positive infinity 
-
----
-
-# The Five Decimal Rounding Modes
-
-All modes are in `enum class rounding_mode` and useable with `boost::decimal::fesetround()`:
-
-1. `fe_dec_downward`
-2. `fe_dec_to_nearest` - To nearest, ties to even
-3. `fe_dec_to_nearest_from_zero`
-4. `fe_dec_toward_zero` - The opposite of 3
-5. `fe_dec_upward`
-
-Default is #2, per IEEE 754 4.3.3 and is called "banker's rounding", and is available also as *`fe_dec_default`*
-
----
-
-# Example of Rounding Mode
-
-```c++
-#include <boost/decimal.hpp>
-#include <iostream>
-
-int main() {
-    using namespace boost::decimal::literals;
-    using boost::decimal::decimal32_t;
-
-    boost::decimal::fesetround(boost::decimal::rounding_mode::fe_dec_upward); // NOT THREAD-SAFE
-
-    const decimal32_t lhs {"5e+50"_DF};
-    const decimal32_t rhs {"4e+40"_DF};
-    const decimal32_t sum {lhs + rhs};
-
-    std::cout << "5e50 + 4e40 = " << sum << std::end;
-}
-```
-Output: `5e50 + 4e40 = 5.000001e+50`
-
-^ Even though the difference in order of magnitude is greater than the precision of the type, any addition in this mode will result in at least a one ULP difference
-
----
-
-# Compile Time Rounding
-
-Very similar to the run-time `enum class`, but we now have the following macros:
-
-1. `BOOST_DECIMAL_FE_DEC_DOWNWARD`
-2. `BOOST_DECIMAL_FE_DEC_TO_NEAREST`
-3. `BOOST_DECIMAL_FE_DEC_TO_NEAREST_FROM_ZERO`
-4. `BOOST_DECIMAL_FE_DEC_TOWARD_ZERO`
-5. `BOOST_DECIMAL_FE_DEC_UPWARD`
-
-^ Each of these are the same as their runtime counterparts. Must be defined prior to any decimal header
-
----
-
-# Changing the Compile Time Rounding Mode
-
-```c++
-#define BOOST_DECIMAL_FE_DEC_DOWNWARD   // before ANY decimal header
-
-#include <boost/decimal/decimal32_t.hpp>
-#include <boost/decimal/literals.hpp>
-
-using namespace boost::decimal::literals;
-using boost::decimal::decimal32_t;
-
-constexpr decimal32_t lhs {"5e+50"_DF};
-constexpr decimal32_t rhs {"4e+40"_DF};
-constexpr decimal32_t res {lhs - rhs};
-
-static_assert(res == "4.999999e+50"_DF, "Incorrectly rounded result");
-```
-
-^ Three points, one slide. Do all three.
-^
-^ 1. Magnitudes differ by ten orders of magnitude — further apart than the
-^    precision of the type. In a directed mode you still move a full ULP.
-^    Changing the rounding mode changes your answers.
-^
-^ 2. The macro works on every compiler, and being read-only it is thread
-^    safe. There is a runtime fesetround too, which needs consteval
-^    detection and is NOT thread safe. One sentence each.
-^
-^ 3. That is a static_assert on a rounded decimal subtraction. Seed for
-^    Part 4 — we got constexpr, and we paid for it.
-
----
-
-# Three things to carry forward
-
-1. Each value has many encodings. `==` is not `memcmp`.
-2. Normalizing is per-operation work.
-3. Five rounding modes available instead of four.
-
-^ Sixty seconds. End of Part 1, and you should be at roughly 17:00.
-
----
-
 [.build-lists: false]
 
-# Part 2 of 6
+# Part 2 of 5
 
 1. Inside the bits
-2. **The library**
-3. In action
-4. The trade
-5. Performance
-6. When to reach for it
-
-^ "You now know more about the encoding than you will ever need in order to
-^ use it. This part is the part you do need."
-^
-^ Ten seconds. Do not linger on dividers.
+2. **The Types**
+3. The Standard Library
+4. Performance
+5. When to reach for it
 
 ---
 
@@ -668,6 +528,23 @@ int n = d;                  // ill-formed
 ^ rather than an apology.
 ^
 ^ Twenty-five seconds.
+
+---
+
+[.build-lists: false]
+
+# Part 3 of 5
+
+1. Inside the bits
+2. The Types
+3. **The Standard Library**
+4. Performance
+5. When to reach for it
+
+^ "You now know more about the encoding than you will ever need in order to
+^ use it. This part is the part you do need."
+^
+^ Ten seconds. Do not linger on dividers.
 
 ---
 
@@ -892,14 +769,122 @@ fmt::format("{:a}", d);     // 3.00e+02
 ^ Alignment, fill, width, sign, precision and the L locale modifier all
 ^ behave exactly as they do for built-in floating point. 
 
+# [fit] Rounding
+
+^ Short divider, or run the next two straight — your call on the clock.
+
 ---
 
-# Boost.Math
+[.build-lists: true]
+
+# Binary Floating Point Rounding
+
+In `<cfenv>` we have the following four macros useable with `std::fesetround()`:
+
+1. `FE_DOWNWARD` - Rounding towards negative infinity 
+2. `FE_TONEAREST` - Rounding towards nearest representable value
+3. `FE_TOWARDZERO`- Rounding towards zero
+4. `FE_UPWARD` - Rounding towards positive infinity 
+
+---
+
+# The Five Decimal Rounding Modes
+
+All modes are in `enum class rounding_mode` and useable with `boost::decimal::fesetround()`:
+
+1. `fe_dec_downward`
+2. `fe_dec_to_nearest` - To nearest, ties to even
+3. `fe_dec_to_nearest_from_zero`
+4. `fe_dec_toward_zero` - The opposite of 3
+5. `fe_dec_upward`
+
+Default is #2, per IEEE 754 4.3.3 and is called "banker's rounding", and is available also as *`fe_dec_default`*
+
+---
+
+# Example of Rounding Mode
+
+```c++
+#include <boost/decimal.hpp>
+#include <iostream>
+
+int main() {
+    using namespace boost::decimal::literals;
+    using boost::decimal::decimal32_t;
+
+    boost::decimal::fesetround(boost::decimal::rounding_mode::fe_dec_upward); // NOT THREAD-SAFE
+
+    const decimal32_t lhs {"5e+50"_DF};
+    const decimal32_t rhs {"4e+40"_DF};
+    const decimal32_t sum {lhs + rhs};
+
+    std::cout << "5e50 + 4e40 = " << sum << std::end;
+}
+```
+Output: `5e50 + 4e40 = 5.000001e+50`
+
+^ Even though the difference in order of magnitude is greater than the precision of the type, any addition in this mode will result in at least a one ULP difference
+
+---
+
+# Compile Time Rounding
+
+Very similar to the run-time `enum class`, but we now have the following macros:
+
+1. `BOOST_DECIMAL_FE_DEC_DOWNWARD`
+2. `BOOST_DECIMAL_FE_DEC_TO_NEAREST`
+3. `BOOST_DECIMAL_FE_DEC_TO_NEAREST_FROM_ZERO`
+4. `BOOST_DECIMAL_FE_DEC_TOWARD_ZERO`
+5. `BOOST_DECIMAL_FE_DEC_UPWARD`
+
+^ Each of these are the same as their runtime counterparts. Must be defined prior to any decimal header
+
+---
+
+# Changing the Compile Time Rounding Mode
+
+```c++
+#define BOOST_DECIMAL_FE_DEC_DOWNWARD   // before ANY decimal header
+
+#include <boost/decimal/decimal32_t.hpp>
+#include <boost/decimal/literals.hpp>
+
+using namespace boost::decimal::literals;
+using boost::decimal::decimal32_t;
+
+constexpr decimal32_t lhs {"5e+50"_DF};
+constexpr decimal32_t rhs {"4e+40"_DF};
+constexpr decimal32_t res {lhs - rhs};
+
+static_assert(res == "4.999999e+50"_DF, "Incorrectly rounded result");
+```
+
+^ Three points, one slide. Do all three.
+^
+^ 1. Magnitudes differ by ten orders of magnitude — further apart than the
+^    precision of the type. In a directed mode you still move a full ULP.
+^    Changing the rounding mode changes your answers.
+^
+^ 2. The macro works on every compiler, and being read-only it is thread
+^    safe. There is a runtime fesetround too, which needs consteval
+^    detection and is NOT thread safe. One sentence each.
+^
+^ 3. That is a static_assert on a rounded decimal subtraction. Seed for
+^    Part 4 — we got constexpr, and we paid for it.
+
+---
+
+# Boost.Math Integration
 
 Bollinger bands over a year of AAPL closes.
 
 ```c++
 #include <boost/math/statistics/univariate_statistics.hpp>
+#include <boost/decimal.hpp>
+
+std::vector<decimal64_t> closes;
+
+// Import closing data from a data source of AAPL 
 
 const decimal64_t mean   = boost::math::statistics::mean(closes);
 const decimal64_t median = boost::math::statistics::median(closes);
@@ -914,21 +899,9 @@ Upper Bollinger Band: $258.11
 Lower Bollinger Band: $156.30
 ```
 
-^ Forty seconds.
-^
-^ "Boost.Math's statistics are generic over Real, and decimal64_t is a
-^ Real." This one really is just the include — unlike <format> and {fmt},
-^ where we wrote the formatter, nobody wrote anything to make this work.
-^
-^ The honest footnote, and say it rather than let them find it in the
-^ example file later: statistics.cpp needs
-^ BOOST_DECIMAL_ALLOW_IMPLICIT_INTEGER_CONVERSIONS plus -Wfloat-equal and
-^ -Wsign-conversion suppressed. Boost.Math assigns integer literals
-^ straight into Real and our constructors are explicit. Verified both
-^ ways: without the macro, single_pass.hpp fails at the same two sites
-^ against Boost 1.83's Math AND against Math develop (2026-08-05).
-^
-^ closes is a std::vector<decimal64_t> parsed with from_chars.
+^ In prior releases you needed BOOST_DECIMAL_ALLOW_IMPLICIT_INTEGER_CONVERSIONS.
+
+^ This is from the example/ directory in the repo
 
 ---
 
@@ -946,331 +919,68 @@ __global__ void add(const decimal64_t* a, const decimal64_t* b,
 }
 ```
 
-Device results compare **exactly equal** to the host loop.
-
-^ Twenty seconds, and do not oversell it — the types and much of the math
-^ are device-capable, not all of it. Functions carrying HOST_DEVICE or
-^ CUDA_CONSTEXPR are the ones that run on device.
+Device results compare to the same loop run on the host
 
 ---
 
-# Debugging with LLDB and GDB
+# Debugging Pretty Printers
 
 ![inline](img/debugger_pair.png)
 
 ^ The debugger understands and represents cohorts
 
-^ We recently added support for NATVIS
+^ Support is available for GDB, LLDB and NATVIS
 
 ---
 
 [.build-lists: false]
 
-# Part 3 of 6
+# Part 4 of 5
 
 1. Inside the bits
-2. The library
-3. **In action**
-4. The trade
-5. Performance
-6. When to reach for it
-
-^ Nine examples. The two forensics lean on the price feed; everything
-^ else stands alone, so any of them can go if the clock is against you.
-^
-^ Seven of the nine are files in example/ in the repository; the two
-^ forensics run from the probe shipped alongside this deck. Say that
-^ once, here, and do not repeat it per slide.
+2. The Types
+3. The Standard Library
+4. **Performance**
+5. When to reach for it
 
 ---
 
-# Adding `0.1` a thousand times
+# Benchmarks
 
-```c++
-constexpr decimal32_t decimal_one_tenth {"0.1"};
-constexpr float       float_one_tenth   {0.1F};
+- Complete Benchmarks are available for the following systems:
 
-for (int i {}; i < 1000; ++i)
-{
-    decimal_value += decimal_one_tenth;
-    float_value   += float_one_tenth;
-}
-```
+1. x86_64 Linux
+2. x86_32 Linux
+3. x86_64 Windows
+4. ARM64 Windows
+5. ARM64 MacOS
 
-```
-Decimal Result: 100
-  Float Result: 99.999
-```
+- GCC `_DecimalXX` and Intel `BID_UINTXX` are included where available for completeness
 
-^ example/addition.cpp
-^
-^ Thirty seconds. Shortest complete demonstration in the library, and the
-^ one people repeat to their colleagues afterwards.
-^
-^ The decimal constant comes from a string, not from 0.1F. Going through
-^ the float literal would import the binary error before the loop started.
+^ Linux uses both GCC and the new Clang-Based Intel Compiler
+
+^ Windows uses MSVC
+
+^ MacOS uses Apple Clang
 
 ---
 
-# Parsing a price feed
-
-252 daily opening prices, one CSV, parsed twice.
-
-```c++
-decimal32_t price;
-from_chars(token, price);                       // decimal column
-
-const float f {std::stof(token)};               // float column
-```
-
-```
-Number of data points: 252
-    Sum from MS Excel: 52151.99
-Sum using decimal32_t: 52151.99
-      Sum using float: 52151.96
-```
-
-^ example/numerical_parsing.cpp
-^
-^ Say it plainly: "this is the program from the first slide." They have
-^ been carrying these numbers since the top of the hour; here is the
-^ loop that made them.
-^
-^ Do not answer parse-versus-sum from the stage yet. The next two slides
-^ take the three cents apart properly.
-
----
-
-# The three cents, itemized
-
-[.code-highlight: 1-2]
-[.code-highlight: 1-3]
-[.code-highlight: 1-4]
-[.code-highlight: all]
-
-```
-parse as       accumulate in     sum
-float          float             52151.964844
-float          double            52151.989944
-double         double            52151.990000
-
-decimal32_t    decimal32_t       52151.99
-```
-
-**The parses cost six thousandths of a cent. The 252 additions cost the rest.**
-
-^ deck_probes.cpp, shipped alongside this deck; numbers at 0429456.
-^
-^ Step the rows like the opening slide — these are the same three
-^ numbers, taken apart.
-^
-^ Row 2 isolates the parse: float parse, double accumulate, and the
-^ damage is six thousandths of a cent. Row 1 turns the accumulation to
-^ float and loses two and a half cents more. Partial sums up near
-^ fifty-two thousand land on a grid of 1/256 — the spacing of floats
-^ between 2^15 and 2^16 — and 252 landings drift.
-^
-^ Say the hammer out loud: a float significand counts integers to
-^ 16,777,216; decimal32_t stops at 9,999,999. The type with the SMALLER
-^ significand is the exact one, because every partial sum here is a
-^ seven-digit decimal value. Representability, not precision — the same
-^ sentence as the top of the hour. (Do not say "more digits": float's
-^ digits10 is 6 to our 7. Integer range is the honest comparison.)
-^
-^ Kahan defusal, when it comes: compensated float summation lands on
-^ 52151.988281. It repairs the drift, cannot repair the parse, and still
-^ cannot hold 52151.99. Right answer to a different question.
-^
-^ Row 3, for whoever whispers "so use double": at full precision it is
-^ 52151.989999999991, and the display rounds it home. The fee run at the
-^ end of this part is where that stops being good enough.
-
----
-
-# The sum depends on the sort
-
-Same 252 values. Three iteration orders.
-
-```
-                  float           decimal32_t
-file order        52151.964844    52151.99
-ascending         52151.984375    52151.99
-descending        52151.992188    52151.99
-```
-
-1,000 random shuffles: **19 distinct float sums**. One decimal sum.
-
-^ Same probe. The shuffles are mt19937 seed 42, each permutation fed to
-^ both types.
-^
-^ Descending happens to land on 52151.99 at two decimals — the bug
-^ appears and disappears with the sort. Your nightly job sums in date
-^ order; the auditor sorts by amount; std::reduce with a parallel policy
-^ is entitled to any order it likes. Same column, and the cent is a
-^ function of iteration order.
-^
-^ Why decimal32_t holds still: every partial sum of this file is a
-^ two-decimal value under a hundred thousand — seven significant digits —
-^ so all 252 partials are exact, and the probe checks each one against
-^ integer cents. Exact partials cannot care about order. Say the durable
-^ rule too: decimal floating point is NOT associative in general;
-^ two-decimal money stays exact for as long as the running total fits
-^ the type, and 52151.99 fits decimal32_t with nothing to spare.
-^
-^ The 19 float answers span 52151.949219 to 52152.023438 — a 7.4-cent
-^ spread across reorderings of the same column.
-
----
-
-# Rounding to the cent
-
-```c++
-const decimal64_t cent {"0.01"};
-
-quantize(decimal64_t{"123.456789"}, cent);      // 123.46
-quantize(decimal64_t{"1.015"},      cent);      // 1.02
-quantize(decimal64_t{"0.145"},      cent);      // 0.14
-```
-
-^ Thirty seconds.
-^
-^ This is the IEEE 754 quantize operation: it gives the result the quantum
-^ exponent of its second argument. You are not multiplying by a hundred and
-^ dividing by a hundred — you are telling the value what its exponent is.
-^
-^ Rounding follows the active mode, so these are ties to even. 1.015 goes
-^ up to 1.02 and 0.145 goes down to 0.14, and both of those are correct.
-
----
-
-# The same question in `double`
-
-```
-value      std::printf("%.2f")   round(x*100)/100   quantize(x, cent)
-1.005            1.00                  1.00               1.00
-1.015            1.01                  1.01               1.02
-1.025            1.02                  1.02               1.02
-2.675            2.67                  2.68               2.68
-8.835            8.84                  8.84               8.84
-0.145            0.14                  0.14               0.14
-1.115            1.11                  1.12               1.12
-```
-
-^ Slow down here. Two separate findings in one table and they are worth
-^ separating out loud.
-^
-^ First: 2.675 and 1.115. The two double spellings disagree with each
-^ other. Same program, same value, same intent. Neither function is buggy —
-^ 2.675 is not in the format, so there is no tie for a tie-breaker to
-^ break, and which side you land on depends on the arithmetic you did to
-^ get there.
-^
-^ Second: 1.015. Every double answer is 1.01 and decimal says 1.02. Ties
-^ to even says 1.02. Double is not breaking the tie differently, it never
-^ had one — the stored value is 1.0149999999999999.
-^
-^ 0.145 is in the table on purpose, so that nobody leaves thinking decimal
-^ just always rounds up.
-
----
-
-# Reconciling a fee run
-
-```c++
-for (const auto price : closes)                 // 252 closes, 10 bps
-{
-    const decimal64_t exact  {price * rate};
-    const decimal64_t billed {quantize(exact, cent)};
-
-    exact_total    += exact;
-    billed_total   += billed;
-    residual_total += (exact - billed);
-}
-```
-
-```
-decimal64_t   billed + residual   52.21589              == exact
-double        billed + residual   52.215889999999881    != exact
-```
-
-^ Forty seconds.
-^
-^ "What you billed plus what you dropped has to equal what you computed.
-^ Not approximately."
-^
-^ Both sides bill 52.22, so the invoice is right either way. It is the
-^ books that do not close.
-^
-^ The double side uses nearbyint, which is ties to even, the same mode —
-^ this gap is not a rounding policy disagreement, it is the format. If you
-^ reach for std::round instead you get ties away from zero and a billed
-^ total of 52.24, which is a different problem and also worth knowing.
-
----
-
-# Reading and writing a file
-
-```c++
-const std::uint32_t word {to_bid(value)};
-out.write(reinterpret_cast<const char*>(&word), sizeof(word));
-
-const decimal32_t recovered {from_bid<decimal32_t>(word)};
-```
-
-```
- Current value: 0.000506           Value as bytes: 2dcd4c57
- Current value: -3.808117e+34      Value as bytes: c0ba1b75
- Current value: -1.656579e-12      Value as bytes: a9994703
-
-Successfully recovered all values from file
-```
-
-^ example/to_from_file.cpp
-^
-^ Thirty seconds. Fixed stride, no parser, and the cohort rides along in
-^ the word — recovered values are bitwise equal, not merely equal.
-^
-^ Do not claim a size win. For short values the text file is smaller. What
-^ you are buying is fixed width and no round-trip through a parser.
-
----
-
-# When the value does not fit
-
-```c++
-decimal32_t {100,  10000};                              // inf
-decimal32_t {100, -10000};                              // 0
-decimal32_t {std::numeric_limits<std::uint64_t>::max()} // 1.844674e+19
-
-static_cast<std::uint32_t>(quiet_NaN);                  // UINT32_MAX
-static_cast<std::uint64_t>(infinity);                   // UINT64_MAX
-
-decimal32_t {"Junk_String"};                            // throws
-```
-
-^ example/basic_construction.cpp and example/integral_conversions.cpp
-^
-^ Forty seconds, and it is the least glamorous slide in the talk. Do it
-^ anyway — this is the first thing anyone evaluating the library will
-^ actually poke at.
-^
-^ Overflow and underflow behave like binary floating point. Integers have
-^ no infinity and no NaN, so both saturate to max. The string constructor
-^ throws, or returns a quiet NaN if exceptions are off, and the library
-^ detects which environment it is in.
-
----
-
-[.build-lists: false]
-
-# Part 4 of 6
+# Part 5 of 5
 
 1. Inside the bits
-2. The library
-3. In action
-4. **The trade**
-5. Performance
-6. When to reach for it
+2. The Types
+3. The Standard Library
+4. Performance
+5. **When to reach for it**
 
-^ Placeholder so the glide path stays wired end to end. Part 4 content
-^ follows.
+---
+
+# Questions and Citation
+
+
+Borland and Kormanyos, (2026). Boost.Decimal: A C++14 Library for Decimal Floating Point Arithmetic. Journal of Open Source Software, 11(124), 10345, https://doi.org/10.21105/joss.10345
+
+There is also a CITATION.cff file in the repo
+
+
+---
