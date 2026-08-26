@@ -384,20 +384,9 @@ $$
 3 \times 10^{2} \quad \longrightarrow \quad 3000000 \times 10^{-4}
 $$
 
-Every arithmetic operation and every comparison has to reckon with cohorts.
+Every arithmetic operation and every comparison has to handle the effects of cohorts.
 
 This is among the most expensive parts of these operations.
-
-^ Load-bearing slide, doing double duty.
-^
-^ "Adding two decimals means aligning two exponents. Comparing them means
-^ agreeing on a representation first. This is not a mode you turn on — it is
-^ what a decimal type does on every single operation."
-^
-^ Flag both callbacks, because you cash them twice:
-^   Part 2 — the fast types are fast because they store normalized and skip
-^            this step.
-^   Part 5 — this is the line item in the comparison benchmarks.
 
 ---
 
@@ -407,31 +396,82 @@ This is among the most expensive parts of these operations.
 
 ---
 
-[.build-lists: false]
+[.build-lists: true]
 
-# Five modes
+# Binary Floating Point Rounding
 
-All the modes are in `enum class rounding_mode`
+In `<cfenv>` we have the following four macros useable with `std::fesetround()`:
 
-1. Downward (`fe_dec_downward`)
-2. **To nearest, ties to even** (`fe_dec_to_nearest`)
-3. To nearest from zero (`fe_dec_to_nearest_from_zero`)
-4. Toward zero (`fe_dec_toward_zero`)
-5. Upward (`fe_dec_upward`)
-
-Default is #2, per IEEE 754 §4.3.3 — "banker's rounding."
-
-^ Twenty seconds, no build.
+1. `FE_DOWNWARD` - Rounding towards negative infinity 
+2. `FE_TONEAREST` - Rounding towards nearest representable value
+3. `FE_TOWARDZERO`- Rounding towards zero
+4. `FE_UPWARD` - Rounding towards positive infinity 
 
 ---
 
-# Rounding can be `constexpr`
+# The Five Decimal Rounding Modes
+
+All modes are in `enum class rounding_mode` and useable with `boost::decimal::fesetround()`:
+
+1. `fe_dec_downward`
+2. `fe_dec_to_nearest` - To nearest, ties to even
+3. `fe_dec_to_nearest_from_zero`
+4. `fe_dec_toward_zero` - The opposite of 3
+5. `fe_dec_upward`
+
+Default is #2, per IEEE 754 4.3.3 and is called "banker's rounding", and is available also as *`fe_dec_default`*
+
+---
+
+# Example of Rounding Mode
+
+```c++
+#include <boost/decimal.hpp>
+#include <iostream>
+
+int main() {
+    using namespace boost::decimal::literals;
+    using boost::decimal::decimal32_t;
+
+    boost::decimal::fesetround(boost::decimal::rounding_mode::fe_dec_upward); // NOT THREAD-SAFE
+
+    const decimal32_t lhs {"5e+50"_DF};
+    const decimal32_t rhs {"4e+40"_DF};
+    const decimal32_t sum {lhs + rhs};
+
+    std::cout << "5e50 + 4e40 = " << sum << std::end;
+}
+```
+Output: `5e50 + 4e40 = 5.000001e+50`
+
+^ Even though the difference in order of magnitude is greater than the precision of the type, any addition in this mode will result in at least a one ULP difference
+
+---
+
+# Compile Time Rounding
+
+Very similar to the run-time `enum class`, but we now have the following macros:
+
+1. `BOOST_DECIMAL_FE_DEC_DOWNWARD`
+2. `BOOST_DECIMAL_FE_DEC_TO_NEAREST`
+3. `BOOST_DECIMAL_FE_DEC_TO_NEAREST_FROM_ZERO`
+4. `BOOST_DECIMAL_FE_DEC_TOWARD_ZERO`
+5. `BOOST_DECIMAL_FE_DEC_UPWARD`
+
+^ Each of these are the same as their runtime counterparts. Must be defined prior to any decimal header
+
+---
+
+# Changing the Compile Time Rounding Mode
 
 ```c++
 #define BOOST_DECIMAL_FE_DEC_DOWNWARD   // before ANY decimal header
 
 #include <boost/decimal/decimal32_t.hpp>
 #include <boost/decimal/literals.hpp>
+
+using namespace boost::decimal::literals;
+using boost::decimal::decimal32_t;
 
 constexpr decimal32_t lhs {"5e+50"_DF};
 constexpr decimal32_t rhs {"4e+40"_DF};
@@ -455,31 +495,10 @@ static_assert(res == "4.999999e+50"_DF, "Incorrectly rounded result");
 
 ---
 
-# Rounding at runtime
-
-```c++
-#include <boost/decimal/decimal32_t.hpp>
-#include <boost/decimal/cfenv.hpp>
-#include <cassert>
-
-boost::decimal::fesetround(boost::decimal::rounding_mode::fe_dec_downward);
-decimal32_t lhs {"5e+50"_DF};
-decimal32_t rhs {"4e+40"_DF};
-decimal32_t res {lhs - rhs};
-
-assert(res == "4.999999e+50"_DF);
-```
-
-This is *not thread-safe*
-
-^ This is very similar to how you change the rounding mode with <cfenv> for normal binary floating point
-
----
-
 # Three things to carry forward
 
-1. One value, many encodings. `==` is not `memcmp`.
-2. Normalizing is per-operation work. Remember that it costs something.
+1. Each value has many encodings. `==` is not `memcmp`.
+2. Normalizing is per-operation work.
 3. Five rounding modes available instead of four.
 
 ^ Sixty seconds. End of Part 1, and you should be at roughly 17:00.
@@ -504,7 +523,7 @@ This is *not thread-safe*
 
 ---
 
-# One include
+# One Include
 
 ```c++
 #include <boost/decimal.hpp>
@@ -516,7 +535,8 @@ Header-only. No dependencies. C++14.
 import boost.decimal; // C++20 module
 ```
 
-b2 · CMake `Boost::decimal` · vcpkg · Conan
+- Available individually through vcpkg and conan, or with Boost in most package managers
+- Build with b2 or CMake
 
 ^ Fifteen seconds. Nobody came for the build system, but somebody will ask,
 ^ so put it on screen once and never mention it again.
@@ -1254,210 +1274,3 @@ decimal32_t {"Junk_String"};                            // throws
 
 ^ Placeholder so the glide path stays wired end to end. Part 4 content
 ^ follows.
-
-<!--
-  ===========================================================================
-  VERIFICATION MANIFEST — Intro
-  ===========================================================================
-  Same toolchain and commit as the Part 2 section; re-verified 2026-08-11.
-
-  Three numbers
-      example/numerical_parsing.cpp, built and run:
-      252 / 52151.99 / 52151.99 / 52151.96.
-      The Excel line is the reference string stored inside that same
-      program — the 2 dp ledger figure. The exact sum is independently
-      confirmed from integer cents parsed straight off the CSV text:
-      5,215,199 cents. (Excel computes in doubles and rounds its
-      display; the displayed figure is what reconciliation targets,
-      which is the point. Defusal lives in the slide note.)
-
-  237 of 252
-      A two-decimal price is exactly representable in binary iff its
-      cents are 00, 25, 50, or 75. Counted by deck_probes.cpp over
-      the Open column: 15 qualify (169, 170, 171.75 x2, 211.5, 220,
-      235, 224, 226, 222.5, 215.75, 224.5, 225, 225.25, 247.5) and 237
-      do not. The probe asserts no price in the column carries more
-      than two fractional digits.
-
-  ===========================================================================
-  VERIFICATION MANIFEST — Part 1
-  ===========================================================================
-  Same toolchain and commit as the Part 2 section; probes re-run 2026-08-11
-  via deck_probes.cpp (Part 1 section at the end of main).
-
-  Hardy & Wright footnote (Five does not divide two)
-      Cited at section granularity: §9.2 "Terminating and recurring
-      decimals", §9.3 "Representation of numbers in other scales".
-      Section titles verified against the 4th-edition text (Ch. IX,
-      "The Representation of Numbers by Decimals"). Theorem-number
-      granularity NOT verified — add from a shelf copy if wanted.
-
-  You know this one (binary32 decode of 0.15625)
-      0.15625f == 0x3E200000 == 0 | 01111100 | 01000000000000000000000
-      (checked via Python struct). Fields: sign 0; exponent 124, bias
-      127 -> 2^-3; fraction .01 with implied 1 -> 1.01_2 = 1.25.
-      1.25 * 2^-3 = 0.15625. The slide's math line is this decode.
-
-  Same value. One more field. (decimal side)
-      decimal32_t{"0.15625"}: decompose -> sig 15625, exp -5;
-      to_bid == 0x30003D09 (0x3D09 == 15625). The slide's math line
-      restates the strip's annotation; both match library behavior.
-
-  Bias claim in the `0.1`, both ways note
-      to_bid(decimal32_t{1,-1}) == 0x32000001; encoded exponent field
-      0b01100100 == 100 for q = -1, hence bias 101.
-
-  One value. Seven encodings. (merged slide)
-      All seven BID words of 300's cohort re-verified 2026-08-11; the
-      slide shows members 1, 2, 3, and 7. Full list in the Part 2
-      "Cohort round trip" entry below.
-
-  Dispositions this round
-      "In the source" slide cut — the five layout masks restated the
-      Four cases table; the non-finite carve-out and the masks-are-in-
-      the-header pointer moved to the Four cases note. The constants
-      shown were verbatim from decimal32_t.hpp if the slide ever
-      returns.
-      "When you would need DPD" slide cut (Matt). Its worked values
-      to_bid(decimal32_t{5}) == 0x32800005 / to_dpd == 0x22500005 are
-      off-slides; the not-tested-against-hardware-DFUs honesty line
-      moved to the BID and DPD note.
-
-  ===========================================================================
-  VERIFICATION MANIFEST — Part 2
-  ===========================================================================
-  Everything below was produced by compiling and running against
-  boostorg/decimal @ 0429456 (develop, 2026-08-06), g++ 13.3.0, Ubuntu 24.04.
-  Nothing on a Part 2 slide is transcribed from the documentation.
-
-  Six types table
-      std::numeric_limits<T>::digits10 / min_exponent10 / max_exponent10
-      and sizeof(T), printed for all six types.
-      decimal32_t max = 9.999999e+96, min = 1e-95.
-
-  Promotion
-      Four static_asserts, all pass:
-        decimal32_t + decimal64_t          -> decimal64_t
-        decimal64_t * 2                    -> decimal64_t
-        decimal64_t + decimal_fast32_t     -> decimal64_t
-        decimal_fast128_t - decimal128_t   -> decimal_fast128_t
-
-  constexpr sqrt
-      Compiles and static_asserts at -std=c++14.
-
-  decompose / frexp10 / normalize
-      Verbatim from example/decompose_frexp10_normalize.cpp.
-
-  Cohort round trip (seven BID words)
-      0x33800003 0x3300001E 0x3280012C 0x32000BB8
-      0x31807530 0x310493E0 0x30ADC6C0
-      Round-tripped through to_chars/from_chars with
-      chars_format::cohort_preserving_scientific. All seven exact.
-      The first, second, third and last match the Part 1 slide.
-
-  {fmt}
-      example/fmt_format.cpp built header-only against fmt 11.1.4,
-      output matches the docs exactly.
-      Detection keys on <fmt/base.h>:  9.1.0 not detected,
-      10.2.1 not detected, 11.1.4 detected. Hence "{fmt} 11 or newer".
-      The example needs -DBOOST_DECIMAL_TEST_FMT as well as the header.
-
-  std::hash
-      All seven cohort members hash to 0x30adc6c0.
-      hash.hpp normalizes, memcpys, and defers to hash<uint32_t>, which is
-      the identity on libstdc++ — hence the hash equals the normalized BID.
-
-  Boost.Math
-      example/statistics.cpp against system Boost 1.83 Math.
-      Output matches the docs: 207.20 / 214.26 / 25.45 / 258.11 / 156.30.
-      Removing BOOST_DECIMAL_ALLOW_IMPLICIT_INTEGER_CONVERSIONS fails to
-      build in boost/math/statistics/detail/single_pass.hpp:
-        "conversion from 'int' to non-scalar type 'Real' requested"
-      Re-tested 2026-08-11: the same two error sites fire against BOTH
-      system Boost 1.83 Math and boostorg/math develop @ 5814eef
-      (2026-08-05). The macro is still load-bearing for this example;
-      it stays off the slides, and the speaker note owns it out loud.
-
-  Debugger image
-      img/debugger_pair.png is doc/modules/ROOT/images/dec32_debug.png and
-      dec32_fast_debug.png stacked with captions, same recipe as the
-      Part 1 bit strips.
-
-  ===========================================================================
-  VERIFICATION MANIFEST — Part 3
-  ===========================================================================
-  Nine examples, same toolchain and commit as above. Nothing carries
-  state between slides; the two forensic slides re-read the same CSV
-  through deck_probes.cpp (shipped alongside this deck), re-run
-  2026-08-11.
-
-  Adding 0.1 a thousand times
-      example/addition.cpp, built and run. 100 and 99.999.
-
-  Parsing a price feed
-      example/numerical_parsing.cpp, built and run against example/AAPL.csv.
-      252 / 52151.99 / 52151.99 / 52151.96.
-
-  The three cents, itemized  (deck_probes.cpp)
-      float parse  + float  accumulate  ->  52151.964844   (-2.5156 c)
-      float parse  + double accumulate  ->  52151.989944   (-0.0056 c)
-      double parse + double accumulate  ->  52151.990000   (-0.0000 c)
-                     at full precision      52151.989999999991
-      decimal32_t                       ->  52151.99  (== 5,215,199 cents)
-      Kahan (float parse, compensated float accumulate): 52151.988281.
-      Significand facts printed by the probe: float holds every integer
-      to 2^24 = 16,777,216 and decimal32_t to 9,999,999, while digits10
-      is 6 for float and 7 for decimal32_t — hence the slide note's
-      instruction to phrase the hammer around integer range, never
-      "more digits".
-
-  The sum depends on the sort  (deck_probes.cpp)
-      file order    float 52151.964844    decimal32_t 52151.99
-      ascending     float 52151.984375    decimal32_t 52151.99
-      descending    float 52151.992188    decimal32_t 52151.99
-      1000 shuffles, mt19937 seed 42, identical permutations fed to
-      both types: 19 distinct float sums in
-      [52151.949219, 52152.023438]; exactly one decimal32_t sum.
-      All 252 running decimal32_t partial sums equal the integer-cents
-      reference, which is what licenses "exact partials cannot care
-      about order" for THIS data — the claim is scoped to the file, and
-      the slide never generalizes it.
-
-  Rounding to the cent
-      quantize(123.456789, 0.01) == 123.46
-      quantize(1.015,      0.01) == 1.02
-      quantize(0.145,      0.01) == 0.14
-      Exported and documented name is `quantize`.
-
-  The same question in double
-      std::printf("%.2f", x), std::round(x*100)/100 and quantize(x, "0.01")
-      over the seven listed values. Divergences: 1.015 (decimal differs
-      from both double spellings) and 2.675 / 1.115 (the two double
-      spellings differ from each other).
-
-  Reconciling a fee run
-      252 closes, rate 0.001, quantize to the cent.
-        decimal64_t   exact 52.21589
-                      billed 52.22
-                      residual -0.00411
-                      billed + residual == exact          -> true
-        double        exact 52.215889999999987
-                      billed 52.219999999999878
-                      residual -0.004109999999999836
-                      billed + residual == exact          -> false
-      double side uses std::nearbyint(x*100)/100, ties to even, matching
-      the decimal default. Rounding policy held constant on purpose.
-      With std::round the billed total is 52.24.
-
-  Reading and writing a file
-      example/to_from_file.cpp. Output block is verbatim from its first
-      three lines plus the success line.
-
-  When the value does not fit
-      All six behaviours run and checked:
-        {100, 10000} -> isinf true;  {100, -10000} -> == 0
-        decimal32_t{UINT64_MAX} -> 1.844674e+19
-        uint32_t(qNaN) == UINT32_MAX;  uint64_t(inf) == UINT64_MAX
-        decimal32_t{"Junk_String"} -> throws std::runtime_error
-          "Can not construct from invalid string"
--->
