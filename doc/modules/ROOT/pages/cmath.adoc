@@ -301,6 +301,7 @@ constexpr DecimalType lgamma(DecimalType x) noexcept;
 | https://en.cppreference.com/w/cpp/numeric/math/ceil[ceil] | Computes the nearest integer not less than the given value
 | https://en.cppreference.com/w/cpp/numeric/math/floor[floor] | Computes the nearest integer not greater than the given value
 | https://en.cppreference.com/w/cpp/numeric/math/trunc[trunc] | Computes the nearest integer not greater in magnitude than the given value
+| https://en.cppreference.com/w/c/numeric/math/roundeven[roundeven] | Computes the nearest integer with halfway cases rounded to even
 | https://en.cppreference.com/w/cpp/numeric/math/round[round] | Computes the nearest integer represented in same decimal format rounding away from zero
 | https://en.cppreference.com/w/cpp/numeric/math/round[lround] | Computes the nearest `long` rounding away from zero
 | https://en.cppreference.com/w/cpp/numeric/math/round[llround] | Computes the nearest `long long` rounding away from zero
@@ -324,6 +325,9 @@ constexpr DecimalType floor(DecimalType x) noexcept;
 
 template <typename DecimalType>
 constexpr DecimalType trunc(DecimalType x) noexcept;
+
+template <typename DecimalType>
+constexpr DecimalType roundeven(DecimalType x) noexcept;
 
 template <typename DecimalType>
 constexpr DecimalType round(DecimalType x) noexcept;

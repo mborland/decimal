@@ -55,6 +55,7 @@
 #include <boost/decimal/detail/cmath/riemann_zeta.hpp>
 #include <boost/decimal/detail/cmath/rint.hpp>
 #include <boost/decimal/detail/cmath/round.hpp>
+#include <boost/decimal/detail/cmath/roundeven.hpp>
 #include <boost/decimal/detail/cmath/sin.hpp>
 #include <boost/decimal/detail/cmath/sinh.hpp>
 #include <boost/decimal/detail/cmath/sqrt.hpp>
