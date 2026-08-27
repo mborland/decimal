@@ -45,7 +45,7 @@ The bitwise representation of `float f = 0.1f;`
 
 ---
 
-# Five does not divide two
+# The Reason? Five does not divide two
 
 A fraction terminates in base *b* only if every prime factor of its denominator divides *b*.[^1]
 
@@ -69,29 +69,19 @@ These numerical types we are about to discuss are useful when these errors are u
 - Human-entered data and databases
 - Legal and regulatory compliance
 
-^ The domains, spoken rather than listed: billing and invoicing,
-^ settlement and clearing, statutory reporting, and interchange with
-^ anything that is decimal by definition — tax tables, price feeds,
-^ exchange tick sizes.
-
 ---
 
-# A brief history
+# A brief history and availability
 
-- **IEEE 754-2008** specifies decimal floating point — two encodings, three interchange formats
+- **IEEE 754-2008** specifies decimal floating point with two encodings and three interchange formats
 - **ISO/IEC TR 24733** (2011) sketches a C++ binding. Never adopted into the standard.
-- **C23** adds `_Decimal32` `_Decimal64` `_Decimal128` — as an *optional* feature
-- **GCC** ships the types on some targets, with no accompanying standard library
+- **N3871** (2014) second attempt at adding decimal types to the C++ standard
+- **C23** adds `_Decimal32` `_Decimal64` `_Decimal128` as an *optional* feature
+- **GCC** libstdc++ ships these types on selected targets (`<decimal/decimal>`), without an accompanying standard library
 - **IBM's libdfp** fills the library gap
 - **Intel** ships a library with its own types
 
-^ Every path here is either non-portable, not C++, or both.
-
-^ If pressed on the last bullet: libdfp pairs with GCC's built-in types
-^ on glibc targets — POWER, s390x, x86 Linux. Intel's library implements
-^ BID entirely in software and defines its own types, so it needs no
-^ compiler support at all. Both are C.
-
+^ There's an active P-paper for rebasing <cmath> on C23 <math.h>, but it specifically excludes Decimal types
 
 ---
 
@@ -106,9 +96,8 @@ These numerical types we are about to discuss are useful when these errors are u
 - Its own `<cmath>` `<charconv>` `<format>`, etc.
 - Boost.Math integration
 - CUDA support for the types and much of the math
-- Tested on x86_64, ARM64, s390x, 32-bit; emulated PPC64LE and Cortex-M
-
-There is a JOSS paper — full citation at the end.
+- Tested on `x86_64`, `x86_32`, ARM64, ARM32, s390x; emulated PPC64LE and Cortex-M
+- There is a JOSS paper with full citation at the end of this talk
 
 ---
 
@@ -116,14 +105,13 @@ There is a JOSS paper — full citation at the end.
 
 # Part 1 of 5
 
-1. Inside the bits
-2. **The Types**
+1. **Inside the bits**
+2. The Types
 3. The Standard Library
 4. Performance
 5. When to reach for it
 
-^ "This is the introduction to decimal floating point that most C++
-^ programmers never got."
+^ "This is the introduction to decimal floating point that most C++ programmers never got."
 
 ---
 
@@ -131,24 +119,18 @@ There is a JOSS paper — full citation at the end.
 
 ![inline](img/float_0p15625.png)
 
-`float`: 1 + 8 + 23 = 32.
+`float` bits: 1 sign + 8 exponent + 23 significand = 32.
 
 $$
-(-1)^{0} \times 1.01_2 \times 2^{\,124-127} = 1.25 \times 2^{-3} = 0.15625
+(-1)^{0} \times 2^{\,124-127} \times 1.01_2 = 1.25 \times 2^{-3} = 1.25 \div 8 = 0.15625
 $$
 
-^ Walk the fields once, left to right, so the decode is explicit:
-^ sign bit 0, positive. Exponent field 01111100 is 124; subtract the
-^ bias of 127 to get 2 to the minus 3. Fraction bits 01, with the
-^ implied leading 1 the format never stores, read 1.01 in binary —
-^ one and a quarter. 1.25 over 8 is 0.15625.
-^
-^ 0.15625 is exactly representable in binary AND in decimal, which is the
-^ point of choosing it — this slide is about structure, not error. Nobody
-^ is being cheated out of anything yet.
-^
-^ Forty-five seconds. Establish the model deliberately, because you are
-^ about to break it.
+^ 1. sign bit 0, positive. 
+2. Exponent field 01111100 is 124; subtract the
+bias of 127 to get 2 to the minus 3. 
+3. Fraction bits 01, with the implied leading 1, read 1.01 in binary give us 1.25. 
+4. 1.25 over 8 is 0.15625.
+5. 0.15625 is exactly representable in binary AND in decimal, which is why it was chosen
 
 ---
 
@@ -160,17 +142,8 @@ $$
 15625 \times 10^{-5} = 0.15625
 $$
 
-^ Let them find the orange cells. That is the whole slide.
-^
-^ "Same thirty-two bits. Same value. And there is a field in the bottom one
-^ that has no counterpart in the top one."
-^
-^ Point at the annotation: the red cells gather up into 15625, and the
-^ exponent says times ten to the minus five. The significand is a decimal
-^ integer. That is the entire idea of BID — the decode line under the
-^ strip is the whole decode. One line each way: the float needed a
-^ power of two and an implied bit; this needs a decimal integer and a
-^ power of ten.
+^ Now we've add the combination field. The way that decimal32_t represents this value is 15625 x 10^-5. 
+You can find 15625 in the lower half of the significand, and then we will talk about the rest
 
 ---
 
@@ -947,7 +920,7 @@ Device results compare to the same loop run on the host
 
 # Benchmarks
 
-- Complete Benchmarks are available for the following systems:
+Complete Benchmarks are available for the following systems:
 
 1. x86_64 Linux
 2. x86_32 Linux
@@ -955,7 +928,7 @@ Device results compare to the same loop run on the host
 4. ARM64 Windows
 5. ARM64 MacOS
 
-- GCC `_DecimalXX` and Intel `BID_UINTXX` are included where available for completeness
+GCC `_DecimalXX` and Intel `BID_UINTXX` are included where available for completeness
 
 ^ Linux uses both GCC and the new Clang-Based Intel Compiler
 
@@ -975,11 +948,10 @@ Device results compare to the same loop run on the host
 
 ---
 
-# 32 bits, head to head
+# 32-bit Types
 
 ![inline](img/perf_x64linux_gcc_32.png)
 
-`decimal_fast32_t` sweeps all five operations; both vendor types trail
 
 ^ Everything is runtime relative to decimal32_t = 1.00 on x86_64 Linux with GCC 14.
 
@@ -989,7 +961,7 @@ Device results compare to the same loop run on the host
 
 ---
 
-# 64 bits, head to head
+# 64-bit Types
 
 ![inline](img/perf_x64linux_gcc_64.png)
 
@@ -999,7 +971,7 @@ One honest loss: GCC `_Decimal64` compares faster than we do
 
 ---
 
-# 128 bits, head to head
+# 128-bit Types
 
 ![inline](img/perf_x64linux_gcc_128.png)
 
@@ -1013,13 +985,11 @@ The closest race of the three widths
 
 ![inline](img/perf_charconv_x64linux.png)
 
-`<charconv>` is software for every type — the hardware advantage disappears
+- `<charconv>` is software for every type so the hardware advantage disappears
 
-^ Left of the dashed line is faster than double. At fixed 6-digit precision, decimal32_t serializes at 0.50–0.62× of double's to_chars. Parsing and printing are exactly the workloads a money pipeline lives in — this is the honest counterweight to the arithmetic slides.
+^ This is also the one case where the fast types are not faster, they have to perform the normalization arithmetic that the regular types do not have to do.
 
-^ These benchmarks require a feature-complete <charconv>: GCC 11+ or MSVC 19.24+, C++17 or later.
-
-^ MSVC is the extreme case — from_chars lands at about 0.21× of double on x86_64 Windows. That chart is in the appendix.
+^ Boost.Charconv is about 15,000 lines for the full implementation whereas this is under 2,000 in decimal
 
 ---
 
@@ -1030,6 +1000,35 @@ The closest race of the three widths
 3. The Standard Library
 4. Performance
 5. **When to reach for it**
+
+---
+
+# Use Cases Revisited
+
+At the top of the presentation we suggested:
+
+- Canonical example and many users are in the financial sector
+- Human-entered data and databases
+- Legal and regulatory compliance
+
+---
+
+# Current Clients Applications
+
+- A trading firm, because their home-brew fixed point could not represent the smallest divisible unit of a Bitcoin (A Satoshi = 1/100,000,000 of a Bitcoin)
+- Several quant firms, who use `<charconv>` extensively
+- A database firm, who needed `decimal128_t` to be run on ARM
+- Boost.MySQL for the DECIMAL data type (in conjunction with Boost.Multiprecision)
+  
+^ As Boost is typically consumed from package managers it is generally quite difficult to know who your customers are. 
+These ones have specifically engaged throughout the development process both publicly or privately
+
+---
+
+# Takeaways
+
+- Decimal Floating Point types can provide a new way to handle data and computations, but there is a performance cost
+- Boost.Decimal is portable, performant, and available everywhere.
 
 ---
 
