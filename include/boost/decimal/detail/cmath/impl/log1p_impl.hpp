@@ -26,185 +26,157 @@ template <bool b>
 struct log1p_table_imp
 {
 private:
-    using d32_coeffs_t  = std::array<decimal32_t,  12>;
-    using d64_coeffs_t  = std::array<decimal64_t,  20>;
-    using d128_coeffs_t = std::array<decimal128_t, 36>;
+    using d32_coeffs_t  = std::array<decimal32_t,   7>;
+    using d64_coeffs_t  = std::array<decimal64_t,  16>;
+    using d128_coeffs_t = std::array<decimal128_t, 34>;
 
-    using d32_fast_coeffs_t  = std::array<decimal_fast32_t,  12>;
-    using d64_fast_coeffs_t  = std::array<decimal_fast64_t,  20>;
-    using d128_fast_coeffs_t = std::array<decimal_fast128_t, 36>;
+    using d32_fast_coeffs_t  = std::array<decimal_fast32_t,   7>;
+    using d64_fast_coeffs_t  = std::array<decimal_fast64_t,  16>;
+    using d128_fast_coeffs_t = std::array<decimal_fast128_t, 34>;
 
 public:
     static constexpr d32_coeffs_t d32_coeffs =
     {{
-         // Series[Log[1 + x], {x, 0, 13}]
-         //            (1),                                                     // * z
-         -boost::decimal::decimal32_t { 5, -1 },                                  // * z^2
-          boost::decimal::decimal32_t { UINT64_C(3333333333333333333), -19 },     // * z^3
-         -boost::decimal::decimal32_t { 25, -2 },                                 // * z^4
-          boost::decimal::decimal32_t { 2, -1 },                                  // * z^5
-         -boost::decimal::decimal32_t { UINT64_C(1666666666666666667), -19 },     // * z^6
-          boost::decimal::decimal32_t { UINT64_C(1428571428571428571), -19 },     // * z^7
-         -boost::decimal::decimal32_t { 125, -3 },                                // * z^8
-          boost::decimal::decimal32_t { UINT64_C(1111111111111111111), -19 },     // * z^9
-         -boost::decimal::decimal32_t { 1, -1 },                                  // * z^10
-          boost::decimal::decimal32_t { UINT64_C(9090909090909090909), -19 - 1 }, // * z^11
-         -boost::decimal::decimal32_t { UINT64_C(8333333333333333333), -19 - 1 }, // * z^12
-          boost::decimal::decimal32_t { UINT64_C(7692307692307692308), -19 - 1 }, // * z^13
+         // Series[2*ArcTanh[w], {w, 0, 13}]
+         boost::decimal::decimal32_t { 2, 0 },                               // * w^1
+         boost::decimal::decimal32_t { UINT64_C(6666666666666666667), -19 }, // * w^3
+         boost::decimal::decimal32_t { UINT64_C(4000000000000000000), -19 }, // * w^5
+         boost::decimal::decimal32_t { UINT64_C(2857142857142857143), -19 }, // * w^7
+         boost::decimal::decimal32_t { UINT64_C(2222222222222222222), -19 }, // * w^9
+         boost::decimal::decimal32_t { UINT64_C(1818181818181818182), -19 }, // * w^11
+         boost::decimal::decimal32_t { UINT64_C(1538461538461538462), -19 }, // * w^13
     }};
 
     static constexpr d32_fast_coeffs_t d32_fast_coeffs =
     {{
-         // Series[Log[1 + x], {x, 0, 13}]
-         //            (1),                                                     // * z
-         -boost::decimal::decimal_fast32_t { 5, -1 },                                  // * z^2
-          boost::decimal::decimal_fast32_t { UINT64_C(3333333333333333333), -19 },     // * z^3
-         -boost::decimal::decimal_fast32_t { 25, -2 },                                 // * z^4
-          boost::decimal::decimal_fast32_t { 2, -1 },                                  // * z^5
-         -boost::decimal::decimal_fast32_t { UINT64_C(1666666666666666667), -19 },     // * z^6
-          boost::decimal::decimal_fast32_t { UINT64_C(1428571428571428571), -19 },     // * z^7
-         -boost::decimal::decimal_fast32_t { 125, -3 },                                // * z^8
-          boost::decimal::decimal_fast32_t { UINT64_C(1111111111111111111), -19 },     // * z^9
-         -boost::decimal::decimal_fast32_t { 1, -1 },                                  // * z^10
-          boost::decimal::decimal_fast32_t { UINT64_C(9090909090909090909), -19 - 1 }, // * z^11
-         -boost::decimal::decimal_fast32_t { UINT64_C(8333333333333333333), -19 - 1 }, // * z^12
-          boost::decimal::decimal_fast32_t { UINT64_C(7692307692307692308), -19 - 1 }, // * z^13
-     }};
+         // Series[2*ArcTanh[w], {w, 0, 13}]
+         boost::decimal::decimal_fast32_t { 2, 0 },                               // * w^1
+         boost::decimal::decimal_fast32_t { UINT64_C(6666666666666666667), -19 }, // * w^3
+         boost::decimal::decimal_fast32_t { UINT64_C(4000000000000000000), -19 }, // * w^5
+         boost::decimal::decimal_fast32_t { UINT64_C(2857142857142857143), -19 }, // * w^7
+         boost::decimal::decimal_fast32_t { UINT64_C(2222222222222222222), -19 }, // * w^9
+         boost::decimal::decimal_fast32_t { UINT64_C(1818181818181818182), -19 }, // * w^11
+         boost::decimal::decimal_fast32_t { UINT64_C(1538461538461538462), -19 }, // * w^13
+    }};
 
     static constexpr d64_coeffs_t d64_coeffs =
     {{
-         // Series[Log[1 + x], {x, 0, 21}]
-         //            (1),                                                     // * z
-         -boost::decimal::decimal64_t { 5, -1 },                                  // * z^2
-          boost::decimal::decimal64_t { UINT64_C(3333333333333333333), -19 },     // * z^3
-         -boost::decimal::decimal64_t { 25, -2 },                                 // * z^4
-          boost::decimal::decimal64_t { 2, -1 },                                  // * z^5
-         -boost::decimal::decimal64_t { UINT64_C(1666666666666666667), -19 },     // * z^6
-          boost::decimal::decimal64_t { UINT64_C(1428571428571428571), -19 },     // * z^7
-         -boost::decimal::decimal64_t { 125, -3 },                                // * z^8
-          boost::decimal::decimal64_t { UINT64_C(1111111111111111111), -19 },     // * z^9
-         -boost::decimal::decimal64_t { 1, -1 },                                  // * z^10
-          boost::decimal::decimal64_t { UINT64_C(9090909090909090909), -19 - 1 }, // * z^11
-         -boost::decimal::decimal64_t { UINT64_C(8333333333333333333), -19 - 1 }, // * z^12
-          boost::decimal::decimal64_t { UINT64_C(7692307692307692308), -19 - 1 }, // * z^13
-         -boost::decimal::decimal64_t { UINT64_C(7142857142857142857), -19 - 1 }, // * z^14
-          boost::decimal::decimal64_t { UINT64_C(6666666666666666667), -19 - 1 }, // * z^15
-         -boost::decimal::decimal64_t { UINT64_C(6250000000000000000), -19 - 1 }, // * z^16
-          boost::decimal::decimal64_t { UINT64_C(5882352941176470588), -19 - 1 }, // * z^17
-         -boost::decimal::decimal64_t { UINT64_C(5555555555555555556), -19 - 1 }, // * z^18
-          boost::decimal::decimal64_t { UINT64_C(5263157894736842105), -19 - 1 }, // * z^19
-         -boost::decimal::decimal64_t { 5, -2 },                                  // * z^20
-          boost::decimal::decimal64_t { UINT64_C(4761904761904761905), -19 - 1 }, // * z^21
-     }};
+         // Series[2*ArcTanh[w], {w, 0, 31}]
+         boost::decimal::decimal64_t { 2, 0 },                                   // * w^1
+         boost::decimal::decimal64_t { UINT64_C(6666666666666666667), -19 },     // * w^3
+         boost::decimal::decimal64_t { UINT64_C(4000000000000000000), -19 },     // * w^5
+         boost::decimal::decimal64_t { UINT64_C(2857142857142857143), -19 },     // * w^7
+         boost::decimal::decimal64_t { UINT64_C(2222222222222222222), -19 },     // * w^9
+         boost::decimal::decimal64_t { UINT64_C(1818181818181818182), -19 },     // * w^11
+         boost::decimal::decimal64_t { UINT64_C(1538461538461538462), -19 },     // * w^13
+         boost::decimal::decimal64_t { UINT64_C(1333333333333333333), -19 },     // * w^15
+         boost::decimal::decimal64_t { UINT64_C(1176470588235294118), -19 },     // * w^17
+         boost::decimal::decimal64_t { UINT64_C(1052631578947368421), -19 },     // * w^19
+         boost::decimal::decimal64_t { UINT64_C(9523809523809523810), -19 - 1 }, // * w^21
+         boost::decimal::decimal64_t { UINT64_C(8695652173913043478), -19 - 1 }, // * w^23
+         boost::decimal::decimal64_t { UINT64_C(8000000000000000000), -19 - 1 }, // * w^25
+         boost::decimal::decimal64_t { UINT64_C(7407407407407407407), -19 - 1 }, // * w^27
+         boost::decimal::decimal64_t { UINT64_C(6896551724137931034), -19 - 1 }, // * w^29
+         boost::decimal::decimal64_t { UINT64_C(6451612903225806452), -19 - 1 }, // * w^31
+    }};
 
     static constexpr d64_fast_coeffs_t d64_fast_coeffs =
     {{
-         // Series[Log[1 + x], {x, 0, 21}]
-         //            (1),                                                     // * z
-         -boost::decimal::decimal_fast64_t { 5, -1 },                                  // * z^2
-          boost::decimal::decimal_fast64_t { UINT64_C(3333333333333333333), -19 },     // * z^3
-         -boost::decimal::decimal_fast64_t { 25, -2 },                                 // * z^4
-          boost::decimal::decimal_fast64_t { 2, -1 },                                  // * z^5
-         -boost::decimal::decimal_fast64_t { UINT64_C(1666666666666666667), -19 },     // * z^6
-          boost::decimal::decimal_fast64_t { UINT64_C(1428571428571428571), -19 },     // * z^7
-         -boost::decimal::decimal_fast64_t { 125, -3 },                                // * z^8
-          boost::decimal::decimal_fast64_t { UINT64_C(1111111111111111111), -19 },     // * z^9
-         -boost::decimal::decimal_fast64_t { 1, -1 },                                  // * z^10
-          boost::decimal::decimal_fast64_t { UINT64_C(9090909090909090909), -19 - 1 }, // * z^11
-         -boost::decimal::decimal_fast64_t { UINT64_C(8333333333333333333), -19 - 1 }, // * z^12
-          boost::decimal::decimal_fast64_t { UINT64_C(7692307692307692308), -19 - 1 }, // * z^13
-         -boost::decimal::decimal_fast64_t { UINT64_C(7142857142857142857), -19 - 1 }, // * z^14
-          boost::decimal::decimal_fast64_t { UINT64_C(6666666666666666667), -19 - 1 }, // * z^15
-         -boost::decimal::decimal_fast64_t { UINT64_C(6250000000000000000), -19 - 1 }, // * z^16
-          boost::decimal::decimal_fast64_t { UINT64_C(5882352941176470588), -19 - 1 }, // * z^17
-         -boost::decimal::decimal_fast64_t { UINT64_C(5555555555555555556), -19 - 1 }, // * z^18
-          boost::decimal::decimal_fast64_t { UINT64_C(5263157894736842105), -19 - 1 }, // * z^19
-         -boost::decimal::decimal_fast64_t { 5, -2 },                                  // * z^20
-          boost::decimal::decimal_fast64_t { UINT64_C(4761904761904761905), -19 - 1 }, // * z^21
-     }};
+         // Series[2*ArcTanh[w], {w, 0, 31}]
+         boost::decimal::decimal_fast64_t { 2, 0 },                                   // * w^1
+         boost::decimal::decimal_fast64_t { UINT64_C(6666666666666666667), -19 },     // * w^3
+         boost::decimal::decimal_fast64_t { UINT64_C(4000000000000000000), -19 },     // * w^5
+         boost::decimal::decimal_fast64_t { UINT64_C(2857142857142857143), -19 },     // * w^7
+         boost::decimal::decimal_fast64_t { UINT64_C(2222222222222222222), -19 },     // * w^9
+         boost::decimal::decimal_fast64_t { UINT64_C(1818181818181818182), -19 },     // * w^11
+         boost::decimal::decimal_fast64_t { UINT64_C(1538461538461538462), -19 },     // * w^13
+         boost::decimal::decimal_fast64_t { UINT64_C(1333333333333333333), -19 },     // * w^15
+         boost::decimal::decimal_fast64_t { UINT64_C(1176470588235294118), -19 },     // * w^17
+         boost::decimal::decimal_fast64_t { UINT64_C(1052631578947368421), -19 },     // * w^19
+         boost::decimal::decimal_fast64_t { UINT64_C(9523809523809523810), -19 - 1 }, // * w^21
+         boost::decimal::decimal_fast64_t { UINT64_C(8695652173913043478), -19 - 1 }, // * w^23
+         boost::decimal::decimal_fast64_t { UINT64_C(8000000000000000000), -19 - 1 }, // * w^25
+         boost::decimal::decimal_fast64_t { UINT64_C(7407407407407407407), -19 - 1 }, // * w^27
+         boost::decimal::decimal_fast64_t { UINT64_C(6896551724137931034), -19 - 1 }, // * w^29
+         boost::decimal::decimal_fast64_t { UINT64_C(6451612903225806452), -19 - 1 }, // * w^31
+    }};
 
     static constexpr d128_coeffs_t d128_coeffs =
     {{
-         // Series[Log[(1 + (z/2))/(1 - (z/2))], {z, 0, 43}]
-         //            (1),                                                                                                                    // * z
-         -::boost::decimal::decimal128_t { 5, -1 },                                                                                              // * z^2
-          ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(180700362080917), UINT64_C(7483252092553221458)  }, -34 }, // * z^3
-         -::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(135525271560688), UINT64_C(1000753050987528192)  }, -34 }, // * z^4
-          ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(108420217248550), UINT64_C(8179300070273843200)  }, -34 }, // * z^5
-         -::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(90350181040458),  UINT64_C(12964998083131386532) }, -34 }, // * z^6
-          ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(77443012320393),  UINT64_C(3207108039665666332)  }, -34 }, // * z^7
-         -::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(67762635780344),  UINT64_C(500376525493764096)   }, -34 }, // * z^8
-          ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(60233454026972),  UINT64_C(8643332055420924359)  }, -34 }, // * z^9
-         -::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(54210108624275),  UINT64_C(4089650035136921600)  }, -34 }, // * z^10
-          ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(492819169311592), UINT64_C(17054915875379776418) }, -35 }, // * z^11
-         -::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(451750905202293), UINT64_C(9484758194528277842)  }, -35 }, // * z^12
-          ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(417000835571347), UINT64_C(15850062977145160938) }, -35 }, // * z^13
-         -::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(387215061601965), UINT64_C(16035540198328331700) }, -35 }, // * z^14
-          ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(361400724161834), UINT64_C(14966504185106442916) }, -35 }, // * z^15
-         -::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(338813178901720), UINT64_C(2501882627468820480)  }, -35 }, // * z^16
-          ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(318882991907501), UINT64_C(5610020838860575434)  }, -35 }, // * z^17
-         -::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(301167270134862), UINT64_C(6323172129685518558)  }, -35 }, // * z^18
-          ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(285316361180395), UINT64_C(16670067533954968520) }, -35 }, // * z^19
-         -::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(271050543121376), UINT64_C(2001506101975056384)  }, -35 }, // * z^20
-          ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(258143374401310), UINT64_C(10690360132218887800) }, -35 }, // * z^21
-         -::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(246409584655796), UINT64_C(8527457937689888204)  }, -35 }, // * z^22
-          ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(235696124453370), UINT64_C(9760763598982462770)  }, -35 }, // * z^23
-         -::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(225875452601146), UINT64_C(13965751134118914724) }, -35 }, // * z^24
-          ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(216840434497100), UINT64_C(16358600140547686400) }, -35 }, // * z^25
-         -::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(208500417785673), UINT64_C(17148403525427356272) }, -35 }, // * z^26
-          ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(200778180089908), UINT64_C(4215448086457012372)  }, -35 }, // * z^27
-         -::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(193607530800982), UINT64_C(17241142136018941658) }, -35 }, // * z^28
-          ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(186931409049224), UINT64_C(16646619993397598836) }, -35 }, // * z^29
-         -::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(180700362080917), UINT64_C(7483252092553221458)  }, -35 }, // * z^30
-          ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(174871318142823), UINT64_C(5456688082434451252)  }, -35 }, // * z^31
-         -::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(169406589450860), UINT64_C(1250941313734410240)  }, -35 }, // * z^32
-          ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(164273056437197), UINT64_C(11833886649696442678) }, -35 }, // * z^33
-         -::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(159441495953750), UINT64_C(12028382456285063520) }, -35 }, // * z^34
-          ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(154886024640786), UINT64_C(6414216079331332674)  }, -35 }, // * z^35
-         -::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(150583635067431), UINT64_C(3161586064842759274)  }, -35 }, // * z^36
-          ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(146513807092635), UINT64_C(13545911456276754540) }, -35 }, // * z^37
+         // Series[2*ArcTanh[w], {w, 0, 67}]
+         ::boost::decimal::decimal128_t { 2, 0 },                                                                                        // * w^1
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(361400724161834), UINT64_C(14966504185106442923) }, -34 }, // * w^3
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(216840434497100), UINT64_C(16358600140547686400) }, -34 }, // * w^5
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(154886024640786), UINT64_C(6414216079331332681) }, -34 },  // * w^7
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(120466908053944), UINT64_C(17286664110841848718) }, -34 }, // * w^9
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(98563833862318), UINT64_C(10789680804559775930) }, -34 },  // * w^11
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(83400167114269), UINT64_C(10548710224912852834) }, -34 },  // * w^13
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(72280144832366), UINT64_C(17750696095988929877) }, -34 },  // * w^15
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(63776598381500), UINT64_C(4811352982514025412) }, -34 },   // * w^17
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(57063272236079), UINT64_C(3334013506790993704) }, -34 },   // * w^19
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(516286748802621), UINT64_C(2933976190728223988) }, -35 },  // * w^21
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(471392248906741), UINT64_C(1074783124255373935) }, -35 },  // * w^23
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(433680868994201), UINT64_C(14270456207385821184) }, -35 }, // * w^25
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(401556360179816), UINT64_C(8430896172914024751) }, -35 },  // * w^27
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(373862818098449), UINT64_C(14846495913085646071) }, -35 }, // * w^29
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(349742636285646), UINT64_C(10913376164868902516) }, -35 }, // * w^31
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(328546112874395), UINT64_C(5221029225683333741) }, -35 },  // * w^33
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(309772049281572), UINT64_C(12828432158662665362) }, -35 }, // * w^35
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(293027614185271), UINT64_C(8645078838843957469) }, -35 },  // * w^37
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(278000557047565), UINT64_C(4417793960193590088) }, -35 },  // * w^39
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(264439554264757), UINT64_C(3302450641466607566) }, -35 },  // * w^41
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(252140040112908), UINT64_C(145889948468931370) }, -35 },   // * w^43
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(240933816107889), UINT64_C(16126584147974145820) }, -35 }, // * w^45
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(230681313294788), UINT64_C(3273345114337031103) }, -35 },  // * w^47
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(221265749486837), UINT64_C(11798414981003268347) }, -35 }, // * w^49
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(212588661271667), UINT64_C(9888928583810234167) }, -35 },  // * w^51
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(204566447638774), UINT64_C(7775502592561777065) }, -35 },  // * w^53
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(197127667724637), UINT64_C(3132617535410000244) }, -35 },  // * w^55
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(190210907453597), UINT64_C(4964463664733461809) }, -35 },  // * w^57
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(183763080082288), UINT64_C(16364473891814588694) }, -35 }, // * w^59
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(177738061063197), UINT64_C(8267792750398720369) }, -35 },  // * w^61
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(172095582934207), UINT64_C(977992063576074663) }, -35 },   // * w^63
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(166800334228539), UINT64_C(2650676376116154053) }, -35 },  // * w^65
+         ::boost::decimal::decimal128_t { boost::int128::uint128_t { UINT64_C(161821219773955), UINT64_C(16337778628851158123) }, -35 }, // * w^67
     }};
 
     static constexpr d128_fast_coeffs_t d128_fast_coeffs =
     {{
-        // Series[Log[(1 + (z/2))/(1 - (z/2))], {z, 0, 43}]
-        //            (1),                                                                                                                    // * z
-        -::boost::decimal::decimal_fast128_t { 5, -1 },                                                                                              // * z^2
-         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(180700362080917), UINT64_C(7483252092553221458)  }, -34 }, // * z^3
-        -::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(135525271560688), UINT64_C(1000753050987528192)  }, -34 }, // * z^4
-         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(108420217248550), UINT64_C(8179300070273843200)  }, -34 }, // * z^5
-        -::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(90350181040458),  UINT64_C(12964998083131386532) }, -34 }, // * z^6
-         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(77443012320393),  UINT64_C(3207108039665666332)  }, -34 }, // * z^7
-        -::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(67762635780344),  UINT64_C(500376525493764096)   }, -34 }, // * z^8
-         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(60233454026972),  UINT64_C(8643332055420924359)  }, -34 }, // * z^9
-        -::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(54210108624275),  UINT64_C(4089650035136921600)  }, -34 }, // * z^10
-         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(492819169311592), UINT64_C(17054915875379776418) }, -35 }, // * z^11
-        -::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(451750905202293), UINT64_C(9484758194528277842)  }, -35 }, // * z^12
-         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(417000835571347), UINT64_C(15850062977145160938) }, -35 }, // * z^13
-        -::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(387215061601965), UINT64_C(16035540198328331700) }, -35 }, // * z^14
-         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(361400724161834), UINT64_C(14966504185106442916) }, -35 }, // * z^15
-        -::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(338813178901720), UINT64_C(2501882627468820480)  }, -35 }, // * z^16
-         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(318882991907501), UINT64_C(5610020838860575434)  }, -35 }, // * z^17
-        -::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(301167270134862), UINT64_C(6323172129685518558)  }, -35 }, // * z^18
-         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(285316361180395), UINT64_C(16670067533954968520) }, -35 }, // * z^19
-        -::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(271050543121376), UINT64_C(2001506101975056384)  }, -35 }, // * z^20
-         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(258143374401310), UINT64_C(10690360132218887800) }, -35 }, // * z^21
-        -::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(246409584655796), UINT64_C(8527457937689888204)  }, -35 }, // * z^22
-         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(235696124453370), UINT64_C(9760763598982462770)  }, -35 }, // * z^23
-        -::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(225875452601146), UINT64_C(13965751134118914724) }, -35 }, // * z^24
-         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(216840434497100), UINT64_C(16358600140547686400) }, -35 }, // * z^25
-        -::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(208500417785673), UINT64_C(17148403525427356272) }, -35 }, // * z^26
-         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(200778180089908), UINT64_C(4215448086457012372)  }, -35 }, // * z^27
-        -::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(193607530800982), UINT64_C(17241142136018941658) }, -35 }, // * z^28
-         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(186931409049224), UINT64_C(16646619993397598836) }, -35 }, // * z^29
-        -::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(180700362080917), UINT64_C(7483252092553221458)  }, -35 }, // * z^30
-         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(174871318142823), UINT64_C(5456688082434451252)  }, -35 }, // * z^31
-        -::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(169406589450860), UINT64_C(1250941313734410240)  }, -35 }, // * z^32
-         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(164273056437197), UINT64_C(11833886649696442678) }, -35 }, // * z^33
-        -::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(159441495953750), UINT64_C(12028382456285063520) }, -35 }, // * z^34
-         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(154886024640786), UINT64_C(6414216079331332674)  }, -35 }, // * z^35
-        -::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(150583635067431), UINT64_C(3161586064842759274)  }, -35 }, // * z^36
-         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(146513807092635), UINT64_C(13545911456276754540) }, -35 }, // * z^37
+         // Series[2*ArcTanh[w], {w, 0, 67}]
+         ::boost::decimal::decimal_fast128_t { 2, 0 },                                                                                        // * w^1
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(361400724161834), UINT64_C(14966504185106442923) }, -34 }, // * w^3
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(216840434497100), UINT64_C(16358600140547686400) }, -34 }, // * w^5
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(154886024640786), UINT64_C(6414216079331332681) }, -34 },  // * w^7
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(120466908053944), UINT64_C(17286664110841848718) }, -34 }, // * w^9
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(98563833862318), UINT64_C(10789680804559775930) }, -34 },  // * w^11
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(83400167114269), UINT64_C(10548710224912852834) }, -34 },  // * w^13
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(72280144832366), UINT64_C(17750696095988929877) }, -34 },  // * w^15
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(63776598381500), UINT64_C(4811352982514025412) }, -34 },   // * w^17
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(57063272236079), UINT64_C(3334013506790993704) }, -34 },   // * w^19
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(516286748802621), UINT64_C(2933976190728223988) }, -35 },  // * w^21
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(471392248906741), UINT64_C(1074783124255373935) }, -35 },  // * w^23
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(433680868994201), UINT64_C(14270456207385821184) }, -35 }, // * w^25
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(401556360179816), UINT64_C(8430896172914024751) }, -35 },  // * w^27
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(373862818098449), UINT64_C(14846495913085646071) }, -35 }, // * w^29
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(349742636285646), UINT64_C(10913376164868902516) }, -35 }, // * w^31
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(328546112874395), UINT64_C(5221029225683333741) }, -35 },  // * w^33
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(309772049281572), UINT64_C(12828432158662665362) }, -35 }, // * w^35
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(293027614185271), UINT64_C(8645078838843957469) }, -35 },  // * w^37
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(278000557047565), UINT64_C(4417793960193590088) }, -35 },  // * w^39
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(264439554264757), UINT64_C(3302450641466607566) }, -35 },  // * w^41
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(252140040112908), UINT64_C(145889948468931370) }, -35 },   // * w^43
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(240933816107889), UINT64_C(16126584147974145820) }, -35 }, // * w^45
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(230681313294788), UINT64_C(3273345114337031103) }, -35 },  // * w^47
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(221265749486837), UINT64_C(11798414981003268347) }, -35 }, // * w^49
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(212588661271667), UINT64_C(9888928583810234167) }, -35 },  // * w^51
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(204566447638774), UINT64_C(7775502592561777065) }, -35 },  // * w^53
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(197127667724637), UINT64_C(3132617535410000244) }, -35 },  // * w^55
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(190210907453597), UINT64_C(4964463664733461809) }, -35 },  // * w^57
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(183763080082288), UINT64_C(16364473891814588694) }, -35 }, // * w^59
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(177738061063197), UINT64_C(8267792750398720369) }, -35 },  // * w^61
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(172095582934207), UINT64_C(977992063576074663) }, -35 },   // * w^63
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(166800334228539), UINT64_C(2650676376116154053) }, -35 },  // * w^65
+         ::boost::decimal::decimal_fast128_t { boost::int128::uint128_t { UINT64_C(161821219773955), UINT64_C(16337778628851158123) }, -35 }, // * w^67
     }};
 };
 
