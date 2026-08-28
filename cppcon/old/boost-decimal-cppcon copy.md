@@ -38,11 +38,7 @@ int main() {
 
 The bitwise representation of `float f = 0.1f;`
 
-![inline](img/float_0p1.png)
-
-$$
-0.1_{10} = 0.0\overline{0011}_2 \qquad \text{(never terminates)}
-$$
+![inline](img/float_0p1_grey.png)
 
 $$
 (-1)^{0} \times 1.10011001100110011001101_2 \times 2^{\,123-127} = \frac{13421773}{2^{27}} = 0.100000001490116119384765625
@@ -127,16 +123,19 @@ This talk will be divided into five parts
 
 ---
 
-# A Binary Floating Point Refresher
+[.build-lists: true]
+[.list: bullet-character( ), bullet-indent(0)]
+
+# A Binary Floating Point Refresher 
 
 ![inline](img/float_0p15625.png)
 
-$$
-\text{float value} \;=\; (-1)^{\text{sign}} \times 2^{\,\text{exponent} - \text{bias}} \times \text{significand}_2
-$$
+- `float` bits = 1 sign + 8 exponent + 23 significand = 32
 
-$$
-(-1)^{0} \;\times\; 2^{\,124-127} \;\times\; 1.01_2 \;=\; 1.25 \times 2^{-3} \;=\; 1.25 \div 8 \;=\; 0.15625
+- `float` value = $$(-1)^{\text{sign}} \times 2^{\text{exponent} - \text{bias}} \times \text{significand}_2 $$
+
+- $$
+(-1)^{0} \times 2^{\,124-127} \times 1.01_2 = 1.25 \times 2^{-3} = 1.25 \div 8 = 0.15625
 $$
 
 ^ 1. sign bit 0, positive. 
@@ -155,9 +154,8 @@ bias of 127 to get 2 to the minus 3.
 
 ![inline](img/pair_0p15625.png)
 
-- $$ 11110100001001_2 = 15625 $$
 - $$ 15625 \times 10^{-5} = 0.15625 $$
-- The high two bits of the exponent become the **combination field**
+- The high two bits of exponent become the combination field
 
 
 ^ Now we've add the combination field. The way that decimal32_t represents this value is 15625 x 10^-5. 
@@ -219,14 +217,6 @@ steer                 layout                              sig. bits
 
 ![inline](img/boundary.png)
 
-$$
-8388607 = 11111111111111111111111_2 \qquad 23 \text{ stored bits}
-$$
-
-$$
-8388608 = \underbrace{100}_{\text{implied}}\,000000000000000000000_2 \qquad 21 \text{ stored bits}
-$$
-
 ^ This is the slide the last three earned. Say almost nothing.
 ^
 ^ "Add one to eight million three hundred eighty-eight thousand six hundred
@@ -242,9 +232,6 @@ $$
 # `0.1`, both ways
 
 ![inline](img/pair_0p1.png)
-
-Instead of an infinite repeating sequence, we get an exact value
-
 
 ^ Deliberate callback — they saw the top strip eight minutes ago and have
 ^ been carrying it since.
