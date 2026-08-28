@@ -14,6 +14,9 @@ footer: IEEE 754 Decimals for C++ · Boost.Decimal · CppCon 2026
 
 ---
 
+[.build-lists: true]
+[.list: bullet-character( ), bullet-indent(0)]
+
 # Start with a Quiz
 
 What is the output of this program?
@@ -27,12 +30,7 @@ int main() {
 }
 ```
 
-
----
-
-# [fit] 0.30000000000000004
-
-Why is this?
+- 0.30000000000000004 and why is this?
 
 ---
 
@@ -40,8 +38,11 @@ Why is this?
 
 The bitwise representation of `float f = 0.1f;`
 
-![inline](img/float_0p1.png)
+![inline](img/float_0p1_grey.png)
 
+$$
+(-1)^{0} \times 1.10011001100110011001101_2 \times 2^{\,123-127} = \frac{13421773}{2^{27}} = 0.100000001490116119384765625
+$$
 
 ---
 
@@ -71,6 +72,8 @@ These numerical types we are about to discuss are useful when these errors are u
 
 ---
 
+[.build-lists: true]
+
 # A brief history and availability
 
 - **IEEE 754-2008** specifies decimal floating point with two encodings and three interchange formats
@@ -85,19 +88,26 @@ These numerical types we are about to discuss are useful when these errors are u
 
 ---
 
-[.build-lists: false]
-
 # Boost.Decimal
 
 - Header-only, **no dependencies**, C++14
-- Six types: `decimal32_t` `decimal64_t` `decimal128_t`
-  and `decimal_fast32_t` `decimal_fast64_t` `decimal_fast128_t`
+- Portable: tested on `x86_64`, `x86_32`, ARM64, ARM32, s390x; emulated PPC64LE and Cortex-M
+- Complete Standard Library: `<cmath>`, `<charconv>`, `<format>`, etc.
+- 3rd Party Library Integration: Boost.Math, {fmt}
 - `constexpr` throughout
-- Its own `<cmath>` `<charconv>` `<format>`, etc.
-- Boost.Math integration
 - CUDA support for the types and much of the math
-- Tested on `x86_64`, `x86_32`, ARM64, ARM32, s390x; emulated PPC64LE and Cortex-M
-- There is a JOSS paper with full citation at the end of this talk
+
+---
+
+[.build-lists: true]
+
+This talk will be divided into five parts
+
+1. Inside the bits - how decimal floating point is represented
+2. The types - an overview of the different types provided by the library, and how to use them
+3. The Standard Library - similarities and differences with the STL
+4. Performance - Comparisons between Boost.Decimal, libstdc++, and Intel decimal types
+5. When to reach for it - Usecases from known users and takeaways 
 
 ---
 
@@ -111,17 +121,20 @@ These numerical types we are about to discuss are useful when these errors are u
 4. Performance
 5. When to reach for it
 
-^ "This is the introduction to decimal floating point that most C++ programmers never got."
-
 ---
+
+[.build-lists: true]
+[.list: bullet-character( ), bullet-indent(0)]
 
 # A Binary Floating Point Refresher 
 
 ![inline](img/float_0p15625.png)
 
-`float` bits: 1 sign + 8 exponent + 23 significand = 32.
+- `float` bits = 1 sign + 8 exponent + 23 significand = 32
 
-$$
+- `float` value = $$(-1)^{\text{sign}} \times 2^{\text{exponent} - \text{bias}} \times \text{significand}_2 $$
+
+- $$
 (-1)^{0} \times 2^{\,124-127} \times 1.01_2 = 1.25 \times 2^{-3} = 1.25 \div 8 = 0.15625
 $$
 
@@ -134,27 +147,32 @@ bias of 127 to get 2 to the minus 3.
 
 ---
 
+[.build-lists: true]
+[.list: bullet-character( ), bullet-indent(0)]
+
 # Same value with one additional field.
 
 ![inline](img/pair_0p15625.png)
 
-$$
-15625 \times 10^{-5} = 0.15625
-$$
+- $$ 15625 \times 10^{-5} = 0.15625 $$
+- The high two bits of exponent become the combination field
+
 
 ^ Now we've add the combination field. The way that decimal32_t represents this value is 15625 x 10^-5. 
 You can find 15625 in the lower half of the significand, and then we will talk about the rest
 
+^ 2 less exponent bits for the 2 combination field bits
+
 ---
 
-# Why the extra field?
+# Why add the combination field?
 
 [.code-highlight: 1]
 [.code-highlight: 1-3]
 [.code-highlight: all]
 
 ```
-decimal32_t holds 7 decimal digits -> max significand 9,999,999
+decimal32_t holds 7 decimal digits -> max significand = 9,999,999
 
 2^23 = 8,388,608 < 9,999,999
 2^24 = 16,777,216 
@@ -183,31 +201,15 @@ You need 24 bits, but sign and exponent leave you with only 23.
 
 ```
 steer                 layout                              sig. bits
- 00    s |      eeeeeeee | ttttttttttttttttttttttt            23
- 01    s |      eeeeeeee | ttttttttttttttttttttttt            23
- 10    s |      eeeeeeee | ttttttttttttttttttttttt            23
+ 00    s | 00 | eeeeeeee | ttttttttttttttttttttttt            23
+ 01    s | 01 | eeeeeeee | ttttttttttttttttttttttt            23
+ 10    s | 10 | eeeeeeee | ttttttttttttttttttttttt            23
  11    s | 11 | eeeeeeee | [100] + ttttttttttttttttttttt      24
 ```
 
-^ STEP 1 — "Zero-zero. The two steering bits concatenate onto six more for
-^ eight bits of exponent, and 23 bits of significand. Exactly like float."
-^
-^ STEP 2 — "Zero-one. Same."
-^
-^ STEP 3 — "One-zero. Same." — By now somebody is wondering why you are
-^ belaboring this. Let the pause run slightly too long.
-^
-^ STEP 4 — "One-one. Different." Exponent moves to its own eight bits, and
-^ the significand gets an implied leading 0b100 plus 21 stored. Twenty-four.
-^
-^ "Three quarters of the encoding space is float-shaped. The last quarter
-^ is where the seventh digit lives."
-^
-^ Two things for Q&A, not the stage: the top of the 11 space is carved
-^ out for non-finites — combination 11110 is infinity, 11111 NaN, one
-^ more bit picks signaling. And the masks for everything in this table
-^ sit near the top of decimal32_t.hpp, reading exactly like the table;
-^ anyone who wants to source-dive can start there.
+100 + 21 trailing 1s = 10,485,759 > 9,999,999
+
+^ Infinities and NaNs are represented using the high bits of the exponent and payload remains
 
 ---
 
@@ -1035,9 +1037,9 @@ These ones have specifically engaged throughout the development process both pub
 # Questions and Citation
 
 
-Borland and Kormanyos, (2026). Boost.Decimal: A C++14 Library for Decimal Floating Point Arithmetic. Journal of Open Source Software, 11(124), 10345, https://doi.org/10.21105/joss.10345
+![inline](img/joss.png)
 
-There is also a CITATION.cff file in the repo
+https://joss.theoj.org/papers/10.21105/joss.10345 or CITATION.cff in the repo
 
 
 ---
