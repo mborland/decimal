@@ -252,6 +252,43 @@ void test_trunc()
 }
 
 template <typename Dec>
+void test_roundeven()
+{
+    std::uniform_int_distribution<int> dist(1, 1);
+
+    BOOST_TEST(isnan(roundeven(std::numeric_limits<Dec>::quiet_NaN() * dist(rng))));
+    BOOST_TEST(isnan(roundeven(-std::numeric_limits<Dec>::quiet_NaN() * dist(rng))));
+    BOOST_TEST(isinf(roundeven(std::numeric_limits<Dec>::infinity() * dist(rng))));
+    BOOST_TEST(isinf(roundeven(-std::numeric_limits<Dec>::infinity() * dist(rng))));
+    BOOST_TEST_EQ(roundeven(Dec(0, 0) * dist(rng)), Dec(0, 0));
+    BOOST_TEST_EQ(roundeven(Dec(-0, 0) * dist(rng)), Dec(-0, 0));
+
+    BOOST_TEST_EQ(roundeven(Dec(5, -1) * dist(rng)), Dec(0, 0));
+    BOOST_TEST_EQ(roundeven(Dec(15, -1) * dist(rng)), Dec(2, 0));
+    BOOST_TEST_EQ(roundeven(Dec(25, -1) * dist(rng)), Dec(2, 0));
+    BOOST_TEST_EQ(roundeven(Dec(-5, -1) * dist(rng)), Dec(0, 0));
+    BOOST_TEST_EQ(roundeven(Dec(-15, -1) * dist(rng)), Dec(-2, 0));
+    BOOST_TEST_EQ(roundeven(Dec(-25, -1) * dist(rng)), Dec(-2, 0));
+
+    BOOST_TEST_EQ(roundeven(Dec(27, -1) * dist(rng)), Dec(3, 0));
+    BOOST_TEST_EQ(roundeven(Dec(-27, -1) * dist(rng)), Dec(-3, 0));
+    BOOST_TEST_EQ(roundeven(Dec(27777, -4) * dist(rng)), Dec(3, 0));
+    BOOST_TEST_EQ(roundeven(Dec(-27777, -4) * dist(rng)), Dec(-3, 0));
+    BOOST_TEST_EQ(roundeven(Dec(2, 40)), Dec(2, 40));
+
+    // Bigger numbers
+    BOOST_TEST_EQ(roundeven(Dec(27777, -2) * dist(rng)), Dec(278, 0));
+    BOOST_TEST_EQ(roundeven(Dec(-27777, -2) * dist(rng)), Dec(-278, 0));
+    BOOST_TEST_EQ(roundeven(Dec(27777, -1) * dist(rng)), Dec(2778, 0));
+
+    // Near zero
+    BOOST_TEST_EQ(roundeven(Dec(3, -1) * dist(rng)), Dec(0, 0));
+    BOOST_TEST_EQ(roundeven(Dec(-3, -1) * dist(rng)), Dec(0, 0));
+    BOOST_TEST_EQ(roundeven(Dec(6, -1) * dist(rng)), Dec(1, 0));
+    BOOST_TEST_EQ(roundeven(Dec(-6, -1) * dist(rng)), Dec(-1, 0));
+}
+
+template <typename Dec>
 void test_frexp10()
 {
     auto expval = int {};
@@ -1468,26 +1505,32 @@ int main()
     test_floor<decimal32_t>();
     test_ceil<decimal32_t>();
     test_trunc<decimal32_t>();
+    test_roundeven<decimal32_t>();
 
     test_floor<decimal_fast32_t>();
     test_ceil<decimal_fast32_t>();
     test_trunc<decimal_fast32_t>();
+    test_roundeven<decimal_fast32_t>();
 
     test_floor<decimal64_t>();
     test_ceil<decimal64_t>();
     test_trunc<decimal64_t>();
+    test_roundeven<decimal64_t>();
 
     test_floor<decimal_fast64_t>();
     test_ceil<decimal_fast64_t>();
     test_trunc<decimal_fast64_t>();
+    test_roundeven<decimal_fast64_t>();
 
     test_floor<decimal128_t>();
     test_ceil<decimal128_t>();
     test_trunc<decimal128_t>();
+    test_roundeven<decimal128_t>();
 
     test_floor<decimal_fast128_t>();
     test_ceil<decimal_fast128_t>();
     test_trunc<decimal_fast128_t>();
+    test_roundeven<decimal_fast128_t>();
 
     test_frexp10<decimal32_t>();
     test_scalbn<decimal32_t>();
