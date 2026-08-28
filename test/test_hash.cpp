@@ -5,6 +5,11 @@
 // Checks that std::hash compiles and that it honours its contract: values which
 // compare equal have to hash equally
 
+#ifdef _MSC_VER
+#pragma warning(push)
+#pragma warning(disable : 4324) // MSVC 14.2 complains that std::pair is padded
+#endif
+
 #include <boost/decimal/decimal32_t.hpp>
 #include <boost/decimal/decimal64_t.hpp>
 #include <boost/decimal/decimal128_t.hpp>
