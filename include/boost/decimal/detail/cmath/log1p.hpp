@@ -7,6 +7,7 @@
 #define BOOST_DECIMAL_DETAIL_CMATH_LOG1P_HPP
 
 #include <boost/decimal/fwd.hpp> // NOLINT(llvm-include-order)
+#include <boost/decimal/detail/cmath/abs.hpp>
 #include <boost/decimal/detail/cmath/impl/log1p_impl.hpp>
 #include <boost/decimal/detail/concepts.hpp>
 #include <boost/decimal/detail/config.hpp>
@@ -59,13 +60,27 @@ constexpr auto log1p_impl(const T x) noexcept
     }
     else
     {
-        if (x > T { 5, -1 })
+        constexpr T small_argument { 1, -std::numeric_limits<T>::digits10 };
+
+        if (abs(x) < small_argument)
+        {
+            // log1p(x) = x - x^2/2 + ... For a value of |x| this small, the sum
+            // of the terms after x is less than one half of the last digit of x.
+            result = x;
+        }
+        else if (abs(x) > T { 5, -1 })
         {
             result = ::boost::decimal::log(x + one);
         }
         else
         {
-            result = x * fma(detail::log1p_series_expansion(x), x, one);
+            // log1p(x) = 2 * atanh(w), with w = x / (2 + x).
+            // For |x| not more than 1/2, the value of |w| is not more than 1/3.
+            // The coefficient table covers this range. For all larger values
+            // of |x|, the first branch calculates log(x + 1).
+            const T w { x / (T { 2, 0 } + x) };
+
+            result = w * detail::log1p_series_expansion(w * w);
         }
     }
 

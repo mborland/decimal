@@ -5,6 +5,7 @@
 
 #include "testing_config.hpp"
 #include <chrono>
+#include <cstring>
 #include <iomanip>
 #include <iostream>
 #include <limits>
@@ -230,6 +231,56 @@ namespace local
     return result_is_ok;
   }
 
+  // These control values cover the range where this function gives an argument
+  // to log1p that is larger than its own argument. The random tests use
+  // decimal32_t and compare with float. Thus they cannot find an error that is
+  // smaller than the epsilon of float.
+  template<typename DecimalType>
+  auto test_acosh_ctrl(const int tol_factor) -> bool
+  {
+    using decimal_type = DecimalType;
+
+    using str_ctrl_array_type = std::array<const char*, 8U>;
+
+    const str_ctrl_array_type x_strings =
+    {{
+      "1.005", "1.01",  "1.02",  "1.03",
+      "1.05",  "1.08",  "1.1",   "1.2",
+    }};
+
+    const str_ctrl_array_type ctrl_strings =
+    {{
+      // Table[N[ArcCosh[x], 36], {x, x_strings}]
+      "0.0999583801386973304627899242727135732",
+      "0.141303769485648577351151646974354648",
+      "0.199668157798415126654606249409538887",
+      "0.244340698822827497531200999061269201",
+      "0.314924756603847871743403417928208223",
+      "0.397380220698482812949273831900413936",
+      "0.443568254385115189132911066352498087",
+      "0.62236250371477866780685115857913059",
+    }};
+
+    bool result_is_ok { true };
+
+    const decimal_type my_tol { std::numeric_limits<decimal_type>::epsilon() * static_cast<decimal_type>(tol_factor) };
+
+    for(auto i = static_cast<std::size_t>(UINT8_C(0)); i < std::tuple_size<str_ctrl_array_type>::value; ++i)
+    {
+      decimal_type x_arg      { };
+      decimal_type ctrl_value { };
+
+      static_cast<void>(from_chars(x_strings[i], x_strings[i] + std::strlen(x_strings[i]), x_arg));
+      static_cast<void>(from_chars(ctrl_strings[i], ctrl_strings[i] + std::strlen(ctrl_strings[i]), ctrl_value));
+
+      const auto result_acosh_is_ok = is_close_fraction(acosh(x_arg), ctrl_value, my_tol);
+
+      result_is_ok = (result_acosh_is_ok && result_is_ok);
+    }
+
+    return result_is_ok;
+  }
+
 } // namespace local
 
 auto main() -> int
@@ -264,6 +315,24 @@ auto main() -> int
   BOOST_TEST(result_edge_is_ok);
 
   result_is_ok = (result_edge_is_ok && result_is_ok);
+
+  {
+    using namespace boost::decimal;
+
+    const auto result_ctrl_is_ok =
+    (
+         local::test_acosh_ctrl<decimal32_t>      (16)
+      && local::test_acosh_ctrl<decimal64_t>      (16)
+      && local::test_acosh_ctrl<decimal128_t>     (16)
+      && local::test_acosh_ctrl<decimal_fast32_t> (16)
+      && local::test_acosh_ctrl<decimal_fast64_t> (16)
+      && local::test_acosh_ctrl<decimal_fast128_t>(16)
+    );
+
+    BOOST_TEST(result_ctrl_is_ok);
+
+    result_is_ok = (result_ctrl_is_ok && result_is_ok);
+  }
 
   result_is_ok = ((boost::report_errors() == 0) && result_is_ok);
 
