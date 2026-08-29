@@ -1712,7 +1712,7 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto d128_div_impl(const decimal128_t& lhs, const d
         switch (rhs_fp)
         {
             case FP_ZERO:
-                q = inf;
+                q = sign ? -inf : inf;
                 r = zero;
                 return;
             case FP_INFINITE:
