@@ -550,21 +550,11 @@ void test_fdim()
 template <typename Dec>
 void test_ilogb()
 {
-    BOOST_DECIMAL_IF_CONSTEXPR (std::is_same<Dec, decimal32_t>::value || std::is_same<Dec, decimal_fast32_t>::value)
-    {
-        BOOST_TEST_EQ(ilogb(Dec(1, 0)), 101);
-        BOOST_TEST_EQ(ilogb(Dec(10, 0)), 102);
-    }
-    else BOOST_DECIMAL_IF_CONSTEXPR (std::is_same<Dec, decimal64_t>::value || std::is_same<Dec, decimal_fast64_t>::value)
-    {
-        BOOST_TEST_EQ(ilogb(Dec(1, 0)), 398);
-        BOOST_TEST_EQ(ilogb(Dec(10, 0)), 399);
-    }
-    else
-    {
-        BOOST_TEST_EQ(ilogb(Dec(1, 0)), 6176);
-        BOOST_TEST_EQ(ilogb(Dec(10, 0)), 6177);
-    }
+    BOOST_TEST_EQ(ilogb(Dec(1, 0)), 0);
+    BOOST_TEST_EQ(ilogb(Dec(10, 0)), 1);
+    BOOST_TEST_EQ(ilogb(Dec(1, -3)), -3);
+    BOOST_TEST_EQ(ilogb(Dec(1000, -6)), -3);
+    BOOST_TEST_EQ(ilogb(Dec(-1, -3)), -3);
 
     std::uniform_int_distribution<int> dist(1, 2);
 
@@ -578,21 +568,11 @@ void test_logb()
 {
     std::uniform_int_distribution<int> dist(1, 1);
 
-    BOOST_DECIMAL_IF_CONSTEXPR (std::is_same<Dec, decimal32_t>::value || std::is_same<Dec, decimal_fast32_t>::value)
-    {
-        BOOST_TEST_EQ(ilogb(Dec(1 * dist(rng), 0)), Dec(101));
-        BOOST_TEST_EQ(ilogb(Dec(10 * dist(rng), 0)), Dec(102));
-    }
-    else BOOST_DECIMAL_IF_CONSTEXPR (std::is_same<Dec, decimal64_t>::value || std::is_same<Dec, decimal_fast64_t>::value)
-    {
-        BOOST_TEST_EQ(ilogb(Dec(1 * dist(rng), 0)), Dec(398));
-        BOOST_TEST_EQ(ilogb(Dec(10 * dist(rng), 0)), Dec(399));
-    }
-    else
-    {
-        BOOST_TEST_EQ(ilogb(Dec(1 * dist(rng), 0)), 6176);
-        BOOST_TEST_EQ(ilogb(Dec(10 * dist(rng), 0)), 6177);
-    }
+    BOOST_TEST_EQ(logb(Dec(1 * dist(rng), 0)), Dec(0));
+    BOOST_TEST_EQ(logb(Dec(10 * dist(rng), 0)), Dec(1));
+    BOOST_TEST_EQ(logb(Dec(1 * dist(rng), -3)), Dec(-3));
+    BOOST_TEST_EQ(logb(Dec(1000 * dist(rng), -6)), Dec(-3));
+    BOOST_TEST_EQ(logb(Dec(-1 * dist(rng), -3)), Dec(-3));
 
     BOOST_TEST_EQ(logb(Dec(0 * dist(rng))), -std::numeric_limits<Dec>::infinity());
     BOOST_TEST_EQ(logb(std::numeric_limits<Dec>::infinity() * dist(rng)), std::numeric_limits<Dec>::infinity());
