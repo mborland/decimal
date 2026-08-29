@@ -1512,7 +1512,7 @@ constexpr auto d64_fast_div_impl(const decimal_fast64_t& lhs, const decimal_fast
         switch (rhs_fp)
         {
             case FP_ZERO:
-                q = inf;
+                q = sign ? -inf : inf;
                 r = zero;
                 return;
             case FP_INFINITE:

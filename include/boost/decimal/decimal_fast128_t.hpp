@@ -1390,7 +1390,7 @@ constexpr auto d128f_div_impl(const decimal_fast128_t& lhs, const decimal_fast12
         switch (rhs_fp)
         {
             case FP_ZERO:
-                q = inf;
+                q = sign ? -inf : inf;
                 r = zero;
                 return;
             case FP_INFINITE:

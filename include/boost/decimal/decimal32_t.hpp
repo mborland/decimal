@@ -2147,7 +2147,7 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto div_impl(const decimal32_t lhs, const decimal3
         switch (rhs_fp)
         {
             case FP_ZERO:
-                q = inf;
+                q = sign ? -inf : inf;
                 r = zero;
                 return;
             case FP_INFINITE:

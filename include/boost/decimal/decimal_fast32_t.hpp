@@ -1377,7 +1377,7 @@ constexpr auto div_impl(const decimal_fast32_t lhs, const decimal_fast32_t rhs, 
         switch (rhs_fp)
         {
             case FP_ZERO:
-                q = inf;
+                q = sign ? -inf : inf;
                 r = zero;
                 return;
             case FP_INFINITE:
