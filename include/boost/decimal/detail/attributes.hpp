@@ -31,7 +31,7 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto storage_width_v() noexcept -> int
            decimal_val_v<DecimalType> < 128 ? 64 : 128;
 }
 
-template <BOOST_DECIMAL_DECIMAL_FLOATING_TYPE DecimalType>
+template <typename DecimalType>
 BOOST_DECIMAL_CUDA_CONSTEXPR auto precision_v() noexcept -> int
 {
     return decimal_val_v<DecimalType> < 64 ? 7 :
@@ -114,6 +114,10 @@ BOOST_DECIMAL_ATTRIBUTE_UNUSED BOOST_DECIMAL_INLINE_CONSTEXPR_VARIABLE auto stor
 
 template <typename Dec, std::enable_if_t<detail::is_decimal_floating_point_v<Dec>, bool> = true>
 BOOST_DECIMAL_ATTRIBUTE_UNUSED BOOST_DECIMAL_INLINE_CONSTEXPR_VARIABLE auto precision_v = impl::precision_v<Dec>();
+
+template <typename T, std::enable_if_t<detail::is_decimal_floating_point_v<T> ||
+                                       detail::is_decimal_floating_point_components_v<T>, bool> = true>
+BOOST_DECIMAL_ATTRIBUTE_UNUSED BOOST_DECIMAL_INLINE_CONSTEXPR_VARIABLE auto operand_precision_v = impl::precision_v<T>();
 
 template <typename Dec, std::enable_if_t<detail::is_decimal_floating_point_v<Dec>, bool> = true>
 BOOST_DECIMAL_ATTRIBUTE_UNUSED BOOST_DECIMAL_INLINE_CONSTEXPR_VARIABLE auto bias_v = impl::bias_v<Dec>();
