@@ -1181,7 +1181,12 @@ void test_nextafter()
         }
     }
 
-    BOOST_TEST(isinf(nextafter(std::numeric_limits<Dec>::infinity() * Dec(dist(rng)), Dec(1))));
+    // Stepping inward from an infinity lands on the largest finite value, as in C's
+    // nextafter(INFINITY, 1.0) and decTest's "nextminus Inf -> 9.999999999999999E+384"
+    BOOST_TEST_EQ(nextafter(std::numeric_limits<Dec>::infinity() * Dec(dist(rng)), Dec(1)),
+                  (std::numeric_limits<Dec>::max)());
+    BOOST_TEST_EQ(nextafter(-std::numeric_limits<Dec>::infinity() * Dec(dist(rng)), Dec(1)),
+                  -(std::numeric_limits<Dec>::max)());
     BOOST_TEST(isnan(nextafter(std::numeric_limits<Dec>::quiet_NaN() * Dec(dist(rng)), Dec(1))));
     BOOST_TEST(isnan(nextafter(Dec(1), std::numeric_limits<Dec>::quiet_NaN() * Dec(dist(rng)))));
     BOOST_TEST(!isinf(nextafter(Dec(1), std::numeric_limits<Dec>::infinity() * Dec(dist(rng)))));
@@ -1224,7 +1229,9 @@ void test_nexttoward()
         }
     }
 
-    BOOST_TEST(isinf(nexttoward(std::numeric_limits<Dec>::infinity() * Dec(dist(rng)), 1)));
+    // See test_nextafter: an infinity steps inward to the largest finite value
+    BOOST_TEST_EQ(nexttoward(std::numeric_limits<Dec>::infinity() * Dec(dist(rng)), 1),
+                  (std::numeric_limits<Dec>::max)());
     BOOST_TEST(isnan(nexttoward(std::numeric_limits<Dec>::quiet_NaN() * Dec(dist(rng)), 1)));
     BOOST_TEST_EQ(nexttoward(Dec(1), 1), Dec(1));
     BOOST_TEST_EQ(nexttoward(Dec(0), 1), std::numeric_limits<Dec>::denorm_min());
