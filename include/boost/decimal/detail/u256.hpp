@@ -1249,7 +1249,10 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR u256 default_div(const u
     const auto m {div_to_words(lhs, u)};
     const auto n {div_to_words(rhs, v)};
 
-    BOOST_DECIMAL_DETAIL_INT128_ASSERT(m >= n);
+    if (m < n)
+    {
+        return u256{};
+    }
 
     int128::detail::impl::knuth_divide<false>(u, m, v, n, q);
 
@@ -1298,7 +1301,10 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR auto div_mod(const u256&
     const auto m {div_to_words(lhs, u)};
     const auto n {div_to_words(rhs, v)};
 
-    BOOST_DECIMAL_DETAIL_INT128_ASSERT(m >= n);
+    if (m < n)
+    {
+        return {u256{}, lhs};
+    }
 
     // Simplify handling of single word division
     // We run into this case with dividing by powers of 10 while rounding u256
@@ -1397,6 +1403,11 @@ BOOST_DECIMAL_FORCE_INLINE BOOST_DECIMAL_CUDA_CONSTEXPR u256 default_mod(const u
 
     const auto m {div_to_words(lhs, u)};
     const auto n {div_to_words(rhs, v)};
+    
+    if (m < n)
+    {
+        return lhs;
+    }
 
     int128::detail::impl::knuth_divide<true>(u, m, v, n, q);
 
