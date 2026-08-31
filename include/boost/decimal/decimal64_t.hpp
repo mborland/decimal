@@ -1312,16 +1312,19 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto issignaling BOOST_DECIMAL_PREVENT_MACRO_SUBSTI
 BOOST_DECIMAL_CUDA_CONSTEXPR auto isnormal BOOST_DECIMAL_PREVENT_MACRO_SUBSTITUTION (const decimal64_t rhs) noexcept -> bool
 {
     #ifndef BOOST_DECIMAL_FAST_MATH
-    // Check for de-normals
     const auto sig {rhs.full_significand()};
-    const auto exp {rhs.unbiased_exponent()};
 
-    if (exp <= detail::precision_v<decimal64_t> - 1)
+    if (sig == 0U || !isfinite(rhs))
     {
         return false;
     }
 
-    return (sig != 0) && isfinite(rhs);
+    // A value is subnormal when its adjusted exponent falls below emin. That depends on how
+    // many digits the significand carries, not on the quantum exponent alone: 1E-383 and
+    // 1.000000000000000E-383 are both the smallest normal decimal64_t but sit 15 quanta apart.
+    const auto adjusted_exp {static_cast<int>(rhs.biased_exponent()) + detail::num_digits(sig) - 1};
+
+    return adjusted_exp >= detail::emin_v<decimal64_t>;
     #else
     return rhs.full_significand() != 0;
     #endif
