@@ -83,7 +83,7 @@ constexpr auto lrint_impl(const T num) noexcept -> Int
         return (std::numeric_limits<Int>::min)();
     }
 
-    if (expptr > detail::precision_v<T>)
+    if (expptr >= 0)
     {
         return static_cast<Int>(num);
     }
@@ -132,8 +132,8 @@ constexpr auto rint(const T num) noexcept
     int expptr {};
     auto sig {frexp10(num, &expptr)}; // Always returns detail::precision digits
     const bool is_neg {num < 0};
-
-    if (expptr > detail::precision_v<T>)
+    
+    if (expptr >= 0)
     {
         return num;
     }

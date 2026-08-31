@@ -730,7 +730,15 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto coefficient_rounding(T1& coeff, T2& exp, T3& b
     const auto offset {removed_digits + shift};
     exp += offset;
     biased_exp += offset;
-    coeff_digits -= offset;
+    
+    if (coeff != 0U)
+    {
+        coeff_digits = detail::num_digits(coeff);
+    }
+    else
+    {
+        coeff_digits = 1;
+    }
 
     return coeff_digits;
 }

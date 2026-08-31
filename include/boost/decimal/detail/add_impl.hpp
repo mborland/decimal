@@ -326,7 +326,10 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto add_impl(const T& lhs, const T& rhs) noexcept 
     // Align to larger exponent
     if (lhs_exp != rhs_exp)
     {
-        constexpr auto max_shift {detail::make_positive_unsigned(std::numeric_limits<promoted_sig_type>::digits10 - detail::precision_v<ReturnType> - 1)};
+        // Size the shift from the operand, not the result. operator+/- pass operands at the
+        // result's precision, but fma passes wider promoted components; sizing from the
+        // result then admits a shift whose multiply overflows promoted_sig_type.
+        constexpr auto max_shift {detail::make_positive_unsigned(std::numeric_limits<promoted_sig_type>::digits10 - detail::operand_precision_v<T> - 1)};
         const auto shift {detail::make_positive_unsigned(lhs_exp - rhs_exp)};
 
         if (shift > max_shift)
@@ -544,7 +547,10 @@ BOOST_DECIMAL_CUDA_CONSTEXPR auto d128_add_impl_new(const T& lhs, const T& rhs) 
     // Align to larger exponent
     if (lhs_exp != rhs_exp)
     {
-        constexpr auto max_shift {detail::make_positive_unsigned(std::numeric_limits<promoted_sig_type>::digits10 - detail::precision_v<ReturnType> - 1)};
+        // Size the shift from the operand, not the result. operator+/- pass operands at the
+        // result's precision, but fma passes wider promoted components; sizing from the
+        // result then admits a shift whose multiply overflows promoted_sig_type.
+        constexpr auto max_shift {detail::make_positive_unsigned(std::numeric_limits<promoted_sig_type>::digits10 - detail::operand_precision_v<T> - 1)};
         const auto shift {detail::make_positive_unsigned(lhs_exp - rhs_exp)};
 
         // Phase 1 small-diff fast path: for shifts in [1, 3], the aligned multiply

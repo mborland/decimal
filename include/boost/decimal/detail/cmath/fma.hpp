@@ -36,13 +36,12 @@ constexpr auto d32_fma_impl(T x, T y, T z) noexcept -> T
     using promoted_type = std::conditional_t<std::is_same<T, decimal32_t>::value, decimal64_t, decimal_fast64_t>;
     using promoted_components = components_type<promoted_type>;
 
-    // Apply the add
     #ifndef BOOST_DECIMAL_FAST_MATH
     BOOST_DECIMAL_IF_CONSTEXPR (checked)
     {
-        if (!isfinite(x) || !isfinite(y))
+        if (!isfinite(x) || !isfinite(y) || !isfinite(z))
         {
-            return detail::check_non_finite(x, y);
+            return x * y + z;
         }
     }
     #endif
@@ -56,19 +55,8 @@ constexpr auto d32_fma_impl(T x, T y, T z) noexcept -> T
     // We still create the result as a decimal type to check for non-finite values and comparisons,
     // but we do not use it for the resultant calculation
 
-    #ifndef BOOST_DECIMAL_FAST_MATH
-    BOOST_DECIMAL_IF_CONSTEXPR (checked)
-    {
-        const T complete_lhs {first_res.sig, first_res.exp, first_res.sign};
-
-        if (!isfinite(complete_lhs) || !isfinite(z))
-        {
-            return detail::check_non_finite(complete_lhs, z);
-        }
-    }
-    #endif
-
     auto z_components {static_cast<promoted_components>(z.to_components())};
+
     detail::expand_significand<promoted_type>(z_components.sig, z_components.exp);
     detail::expand_significand<promoted_type>(first_res.sig, first_res.exp);
 
@@ -81,13 +69,12 @@ constexpr auto d64_fma_impl(T x, T y, T z) noexcept -> T
     using promoted_type = std::conditional_t<std::is_same<T, decimal64_t>::value, decimal128_t, decimal_fast128_t>;
     using promoted_components = components_type<promoted_type>;
 
-    // Apply the add
     #ifndef BOOST_DECIMAL_FAST_MATH
     BOOST_DECIMAL_IF_CONSTEXPR (checked)
     {
-        if (!isfinite(x) || !isfinite(y))
+        if (!isfinite(x) || !isfinite(y) || !isfinite(z))
         {
-            return detail::check_non_finite(x, y);
+            return x * y + z;
         }
     }
     #endif
@@ -100,19 +87,9 @@ constexpr auto d64_fma_impl(T x, T y, T z) noexcept -> T
     // Apply the mul on the carried components
     // We still create the result as a decimal type to check for non-finite values and comparisons,
     // but we do not use it for the resultant calculation
-    const T complete_lhs {first_res.sig, first_res.exp, first_res.sign};
-
-    #ifndef BOOST_DECIMAL_FAST_MATH
-    BOOST_DECIMAL_IF_CONSTEXPR (checked)
-    {
-        if (!isfinite(complete_lhs) || !isfinite(z))
-        {
-            return detail::check_non_finite(complete_lhs, z);
-        }
-    }
-    #endif
 
     auto z_components {static_cast<promoted_components>(z.to_components())};
+
     detail::expand_significand<promoted_type>(z_components.sig, z_components.exp);
     detail::expand_significand<promoted_type>(first_res.sig, first_res.exp);
 

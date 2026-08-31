@@ -100,6 +100,7 @@ run github_issue_1398.cpp ;
 run github_issue_1424.cpp ;
 run github_issue_1436.cpp ;
 run github_issue_1437.cpp ;
+run github_issue_1440.cpp ;
 
 run link_1.cpp link_2.cpp link_3.cpp ;
 run quick.cpp ;
