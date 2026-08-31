@@ -25,9 +25,12 @@ from PIL import Image, ImageDraw, ImageFont
 FD = "/usr/share/fonts/truetype/dejavu"
 OUT = "/mnt/user-data/outputs/img"
 
-LEFT, CELL_W, CELL_H, CELL_GAP, FIELD_GAP = 30, 60, 89, 2, 14
+MARGIN, GUTTER = 30, 215
+LEFT = MARGIN + GUTTER
+CELL_W, CELL_H, CELL_GAP, FIELD_GAP = 60, 89, 2, 14
 RIGHT_PAD, RIGHT_OFF = 310, 35
-RULE_H, SWATCH, GHOST_W = 6, 46, 5
+RULE_H, GHOST_W = 6, 5
+SWATCH, SWATCH_GAP = 64, 20
 CAP_H, CAP_GAP = 56, 34
 
 TEXT = (242, 244, 246)
@@ -42,7 +45,7 @@ F_NAME = ImageFont.truetype(f"{FD}/DejaVuSans-Bold.ttf", 31)
 F_GHOST = ImageFont.truetype(f"{FD}/DejaVuSans-Bold.ttf", 26)
 F_SIZE = ImageFont.truetype(f"{FD}/DejaVuSansMono-Bold.ttf", 40)
 F_RIGHT = ImageFont.truetype(f"{FD}/DejaVuSansMono.ttf", 46)
-F_LEGEND = ImageFont.truetype(f"{FD}/DejaVuSansMono-Bold.ttf", 40)
+F_LEGEND = ImageFont.truetype(f"{FD}/DejaVuSansMono-Bold.ttf", 46)
 F_CAP = ImageFont.truetype(f"{FD}/DejaVuSans-Bold.ttf", 38)
 
 FLOAT32 = [(1, "Sign", SIGN), (8, "Exponent", EXPO), (23, "Significand", SIGD)]
@@ -66,9 +69,6 @@ def draw(fname, word, fields, value, sizes=True, legend=True, implied=None):
     ghost = implied or ""
 
     y = 0
-    y_legend = y
-    if legend:
-        y += SWATCH + 30
     y_name = y
     y += 48
     y_size = y
@@ -77,7 +77,11 @@ def draw(fname, word, fields, value, sizes=True, legend=True, implied=None):
     y_rule = y
     y += RULE_H + 12
     y_cell = y
-    height = y_cell + CELL_H + 14
+    # the legend is a vertical key in the left gutter, centred on the cells
+    key_h = 2 * SWATCH + SWATCH_GAP
+    y_key = y_cell + (CELL_H - key_h) // 2
+    overhang = max(0, y_key + key_h - (y_cell + CELL_H))
+    height = y_cell + CELL_H + (overhang + 14 if legend else 14)
 
     # first pass: x extents, inserting the ghost run ahead of the last field
     cols, gaps, x, ghost_x = [], [], LEFT, None
@@ -96,13 +100,12 @@ def draw(fname, word, fields, value, sizes=True, legend=True, implied=None):
     d = ImageDraw.Draw(im)
 
     if legend:
-        lx = LEFT
+        ky = y_key
         for swatch, t in ((ONE, "1"), (ZERO, "0")):
-            d.rectangle([lx, y_legend, lx + SWATCH, y_legend + SWATCH],
-                        fill=swatch)
-            d.text((lx + SWATCH + 16, y_legend + SWATCH // 2), f"= {t}",
+            d.rectangle([MARGIN, ky, MARGIN + SWATCH, ky + SWATCH], fill=swatch)
+            d.text((MARGIN + SWATCH + 18, ky + SWATCH // 2), f"= {t}",
                    font=F_LEGEND, fill=TEXT, anchor="lm")
-            lx += 190
+            ky += SWATCH + SWATCH_GAP
 
     for (count, label, colour), (x0, x1, cx) in zip(fields, cols):
         d.text((cx, y_name), label, font=F_NAME, fill=colour, anchor="ma")
@@ -155,7 +158,7 @@ def stack(fname, items):
     d = ImageDraw.Draw(out)
     y = 0
     for (cap, _), im in zip(items, imgs):
-        d.text((30, y + 8), cap, font=F_CAP, fill=TEXT)
+        d.text((MARGIN, y + 8), cap, font=F_CAP, fill=TEXT)
         out.paste(im, (0, y + CAP_H), im)
         y += CAP_H + im.height + CAP_GAP
     out.save(f"{OUT}/{fname}", "PNG")
