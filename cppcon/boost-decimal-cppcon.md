@@ -9,8 +9,9 @@ footer: IEEE 754 Decimals for C++ · Boost.Decimal · CppCon 2026
 
 ![](img/cover.png)
 
-^ Full-bleed title card. First words set up the next slide: "I want to
-^ start with three numbers."
+^ Welcome to IEEE 754 Decimals for C++ - The Boost Decimal library.
+
+^ I am Matt Borland and today we will discuss a relatively new IEEE type and Boost library
 
 ---
 
@@ -32,6 +33,10 @@ int main() {
 
 - 0.30000000000000004 and why is this?
 
+^ First we will start with a quiz. What is the output of the program on the screen?
+
+^ If you said 3 followed by 15 zeros then 4 you'd be correct. If not, we will see why this is the case
+
 ---
 
 # Where the extra came from
@@ -48,6 +53,12 @@ $$
 (-1)^{0} \times 1.10011001100110011001101_2 \times 2^{\,123-127} = \frac{13421773}{2^{27}} = 0.100000001490116119384765625
 $$
 
+^ Here are the bits of 0.1f which we will dive into greater detail later
+
+^ We see that 0.1 in base 10 is 0.00011 in base two with the last four digits infinitely repeating
+
+^ Since this never terminates it is actually slightly more than 0.1, but why does it not terminate?
+
 ---
 
 # The Reason? Five does not divide two
@@ -58,9 +69,15 @@ $$
 \frac{1}{10} \qquad 10 = 2 \times 5 \qquad 5 \nmid 2
 $$
 
-No number of bits fixes this. The problem is not precision, but **representability**.
+No number of bits fixes this. The problem is not precision, but *representability*.
 
 [^1]: Hardy & Wright, *An Introduction to the Theory of Numbers*, §9.2–9.3.
+
+^ The explanation is actually quite easy, it is that five doe not divide two
+
+^ As hardy and wright tell us "A fraction terminates in base *b* only if every prime factor of its denominator divides *b*"
+
+^ This is not a precision problem, this is a representation problem
 
 ---
 
@@ -73,6 +90,10 @@ These numerical types we are about to discuss are useful when these errors are u
 - Canonical example and many users are in the financial sector
 - Human-entered data and databases
 - Legal and regulatory compliance
+
+^ Since this is a representation problem the solution is not to simply add more precision such as using 128 bit floats
+
+^ *Read the build slide*
 
 ---
 
@@ -88,18 +109,23 @@ These numerical types we are about to discuss are useful when these errors are u
 - **IBM's libdfp** fills the library gap
 - **Intel** ships a library with its own types
 
-^ There's an active P-paper for rebasing <cmath> on C23 <math.h>, but it specifically excludes Decimal types
+^ *Read the build slide*
+
+^ There's an active P-paper for rebasing <cmath> on C23 <math.h>, but it specifically excludes Decimal types. 
+For those interested it is (3935R2 for those interested) 
 
 ---
 
 # Boost.Decimal
 
-- Header-only, **no dependencies**, C++14
+- Header-only, *no dependencies*, C++14
 - Portable: tested on `x86_64`, `x86_32`, ARM64, ARM32, s390x; emulated PPC64LE and Cortex-M
 - Complete Standard Library: `<cmath>`, `<charconv>`, `<format>`, etc.
 - 3rd Party Library Integration: Boost.Math, {fmt}
 - `constexpr` throughout
 - CUDA support for the types and much of the math
+
+^ *Read the build slide*
 
 ---
 
@@ -111,7 +137,9 @@ This talk will be divided into five parts
 2. The types - an overview of the different types provided by the library, and how to use them
 3. The Standard Library - similarities and differences with the STL
 4. Performance - Comparisons between Boost.Decimal, libstdc++, and Intel decimal types
-5. When to reach for it - Usecases from known users and takeaways 
+5. When to reach for it - Use cases from known users and takeaways 
+
+^ *Read the build slide*
 
 ---
 
@@ -125,19 +153,24 @@ This talk will be divided into five parts
 4. Performance
 5. When to reach for it
 
+^ Now lets take a look at the bits
+
 ---
 
 # A Binary Floating Point Refresher
 
+[.build-lists: true]
+[.list: bullet-character( ), bullet-indent(0)]
+
 ![inline](img/float_0p15625.png)
 
-$$
-\text{float value} \;=\; (-1)^{\text{sign}} \times 2^{\,\text{exponent} - \text{bias}} \times \text{significand}_2
-$$
+- $$ \text{float value} \;=\; (-1)^{\text{sign}} \times 2^{\,\text{exponent} - \text{bias}} \times \text{significand}_2 $$
 
-$$
-(-1)^{0} \;\times\; 2^{\,124-127} \;\times\; 1.01_2 \;=\; 1.25 \times 2^{-3} \;=\; 1.25 \div 8 \;=\; 0.15625
-$$
+- $$ (-1)^{0} \;\times\; 2^{\,124-127} \;\times\; 1.01_2 \;=\; 1.25 \times 2^{-3} \;=\; 1.25 \div 8 \;=\; 0.15625 $$
+
+- Section 3.4 of IEEE 754-2019
+
+^ Float value = ...
 
 ^ 1. sign bit 0, positive. 
 2. Exponent field 01111100 is 124; subtract the
@@ -157,13 +190,14 @@ bias of 127 to get 2 to the minus 3.
 
 - $$ 11110100001001_2 = 15625 $$
 - $$ 15625 \times 10^{-5} = 0.15625 $$
-- The high two bits of the exponent become the **combination field**
+- The high two bits of the exponent become the *steering bits*
 
+^ Here we can find 15625 in the significand since it's encoded like an integer would be
 
-^ Now we've add the combination field. The way that decimal32_t represents this value is 15625 x 10^-5. 
-You can find 15625 in the lower half of the significand, and then we will talk about the rest
+^ Then the exponent gives 10 ^-5 forming 0.15625
 
-^ 2 less exponent bits for the 2 combination field bits
+^ As you can see we've given up the high two bits of the exponent for what are referred to as steering bit. 
+Together with the exponent this is called the *combination field*. What is this for though?
 
 ---
 
@@ -182,20 +216,14 @@ decimal32_t holds 7 decimal digits -> max significand = 9,999,999
 You need 24 bits, but sign and exponent leave you with only 23.
 ```
 
-^ STEP 1 — seven digits, so the largest significand is 9,999,999.
-^
-^ STEP 2 — that needs 24 bits.
-^
-^ STEP 3 — and you have 23.
-^
-^ "Ten is not a power of two. The fields do not divide evenly. Everything
-^ strange about this encoding is downstream of that one sentence. The
-^ combination field is how you buy back the twenty-fourth bit."
+^ JUST READ THE SLIDE*
 
 ---
 
 # Four cases
 
+[.build-lists: true]
+[.list: bullet-character( ), bullet-indent(0)]
 [.code-highlight: 1-2]
 [.code-highlight: 1-3]
 [.code-highlight: 1-4]
@@ -203,15 +231,23 @@ You need 24 bits, but sign and exponent leave you with only 23.
 
 ```
 steer                 layout                              sig. bits
- 00    s | 00 | eeeeeeee | ttttttttttttttttttttttt            23
- 01    s | 01 | eeeeeeee | ttttttttttttttttttttttt            23
- 10    s | 10 | eeeeeeee | ttttttttttttttttttttttt            23
+ 00    s | 00 | eeeeee   | ttttttttttttttttttttttt            23
+ 01    s | 01 | eeeeee   | ttttttttttttttttttttttt            23
+ 10    s | 10 | eeeeee   | ttttttttttttttttttttttt            23
  11    s | 11 | eeeeeeee | [100] + ttttttttttttttttttttt      24
 ```
 
-100 + 21 trailing 1s = 10,485,759 > 9,999,999
+- $$100_2$$ + 21 trailing 1s = 10,485,759 > 9,999,999
 
-^ Infinities and NaNs are represented using the high bits of the exponent and payload remains
+- Non-finite numbers also encode with 11 steering bits
+
+- Example: infinity = 0 | 11 | 1100 + payload
+
+^ Read the slide
+
+^ The last two 0 bits for the infinity are used to make a quiet nan or a signaling nan
+
+^ So what does this look like in practice?
 
 ---
 
@@ -227,15 +263,7 @@ $$
 8388608 = \underbrace{100}_{\text{implied}}\,000000000000000000000_2 \qquad 21 \text{ stored bits}
 $$
 
-^ This is the slide the last three earned. Say almost nothing.
-^
-^ "Add one to eight million three hundred eighty-eight thousand six hundred
-^ and seven. The exponent field grows by two cells. The significand shrinks
-^ by two and picks up an implied one-zero-zero. Same value plus one. Total
-^ structural reorganization."
-^
-^ If you want a laugh: "if you were hoping the bit pattern was monotonic in
-^ the value, this is where that hope goes."
+^ As you can see incrementing by one can actually 
 
 ---
 
@@ -246,14 +274,8 @@ $$
 Instead of an infinite repeating sequence, we get an exact value
 
 
-^ Deliberate callback — they saw the top strip eight minutes ago and have
-^ been carrying it since.
-^
-^ "Same width. Thirty-two bits on both sides. The bottom one contains the
-^ number I asked for, and it contains it exactly. One times ten to the
-^ minus one."
-^
-^ Bias is 101, so a biased exponent of 100 is q = -1. Have it ready.
+^ Returning to our earlier example of 0.1 we can now see how it is exactly represented in the decimal type.
+We have a clear 1 in the significand, and then a biased exponent which gives us 10^-1 resulting in an exact 0.1
 
 ---
 
@@ -273,17 +295,16 @@ constexpr std::uint32_t to_dpd_d32(decimal32_t val)      noexcept;
 constexpr decimal32_t   from_dpd_d32(std::uint32_t bits) noexcept;
 ```
 
-^ Plus generic to_bid/to_dpd/from_bid<T>/from_dpd<T>, which is what every
-^ strip in this section actually called.
-^
-^ Be precise if asked about hardware: the conversions are encoding
-^ interchange. The library is not tested against hardware decimal units,
-^ because they are not readily accessible to test against — s390x is in
-^ CI for endianness, not for its DFU.
+^ For the sake of completeness there are actually two specified encodings for decimal floating point types
+
+^ Read the slide
 
 ---
 
 # BID vs DPD for our adjacent integers
+[.code-highlight: 1]
+[.code-highlight: 1-2]
+[.code-highlight: 1,3]
 
 ```
                           BID           DPD
@@ -291,18 +312,16 @@ decimal32_t{8388607}  0x32FFFFFF    0x6A573B07
 decimal32_t{8388608}  0x6CA00000    0x6A573B08
 ```
 
-**BID** rebuilds the word.
+*BID* rebuilds the word. 
+*DPD* increments by one.
 
-**DPD** increments by one.
+^ Here is our edge case integer where the steering bits change
 
-^ Hex is right here, because the delta IS the point.
-^
-^ "DPD packs three decimal digits into every ten-bit declet, so 607 and 608
+^ DPD packs three decimal digits into every ten-bit declet, so 607 and 608
 ^ live in the low bits and nothing else moves. BID treats the significand as
-^ one binary integer, so changing the integer changes the encoding."
-^
-^ "Digit locality is what you want when digits are wired into silicon. A
-^ single binary integer is what you want in software."
+^ one binary integer, so changing the integer changes the encoding.
+
+^ The benefit to this design is that digit locality is what you want when digits are in silicon
 
 ---
 
@@ -315,10 +334,20 @@ decimal32_t{8388608}  0x6CA00000    0x6A573B08
 
 ---
 
-# One value. Seven encodings.
+[.build-lists: true]
+[.code-highlight: none]
+[.code-highlight: 1]
+[.code-highlight: 2]
+[.code-highlight: 3]
+[.code-highlight: 4]
+[.code-highlight: all]
 
-> The set of representations a floating-point number maps to is called the floating-point number's cohort.
--- IEEE 754-2008
+# One value. Seven Representations.
+
+> "cohort: The set of all floating-point representations that represent a given floating-point number in a given floating-point format. 
+In this context −0 and +0 are considered distinct and are in different cohorts."
+-- IEEE 754-2019
+
 
 ```
 decimal32_t{      3,  2}   ->   0x33800003
@@ -328,34 +357,28 @@ decimal32_t{3000000, -4}   ->   0x30ADC6C0
 ```
 
 - All compare equal with `operator==`
-- All **hash equal**
+- All *hash equal*
 - None are bitwise equal
 
-^ Seven members in 300's cohort, because seven digits give 3 exactly
-^ seven stops: 3 times ten squared out to 3000000 times ten to the
-^ minus four. Four shown, for space.
-^
-^ Binary has exactly one way to write each value, so nothing in
-^ anyone's experience prepares them for this.
-^
-^ "operator== says these are the same number. std::hash agrees, because it
-^ has to. memcmp does not."
-^
-^ Do not resolve it — Part 2 is where charconv pays this off.
+^ *READ AND BUILD THE SLIDE*
 
 ---
 
+[.build-lists: true]
+
 # Normalizing
 
-A value is **normalized** when the cohort effect is removed by appending zeros to the significand and reducing the exponent until it carries the type's full precision:
+- A value is *normalized* when the cohort effect is removed by appending zeros to the significand and reducing the exponent until it carries the type's full precision:
 
-$$
-3 \times 10^{2} \quad \longrightarrow \quad 3000000 \times 10^{-4}
-$$
+- Example: $$ 3 \times 10^{2} \quad \longrightarrow \quad 3000000 \times 10^{-4} $$
 
-Every arithmetic operation and every comparison has to handle the effects of cohorts.
+- Every arithmetic operation and every comparison has to handle the effects of cohorts.
 
-This is among the most expensive parts of these operations.
+- This is among the most expensive parts of these operations.
+
+^ Read the slide
+
+^ Remember from our last slide that -0 and +0 are considered to be in distinct and in different cohorts so this has to be handled as well
 
 ---
 

@@ -17,7 +17,8 @@ as LaTeX so it can be coloured to match the fields and read at any size.
 
 Palette
     1        #E8A33D  amber          0        #6B7076  neutral grey
-    fields   Sign #E8EAED, Comb #D4789B, Exponent #3A8FD0, Significand #C9B89A
+    fields   Sign #E8EAED, Steering #D4789B, Exponent #3A8FD0,
+             Significand #C9B89A
 """
 import struct
 from PIL import Image, ImageDraw, ImageFont
@@ -37,11 +38,13 @@ TEXT = (242, 244, 246)
 ONE = (232, 163, 61)
 ZERO = (107, 112, 118)
 SIGN = (232, 234, 237)
-COMB = (212, 120, 155)
+STEER = (212, 120, 155)
 EXPO = (58, 143, 208)
 SIGD = (201, 184, 154)
 
-F_NAME = ImageFont.truetype(f"{FD}/DejaVuSans-Bold.ttf", 31)
+# 27pt is the largest uniform size at which no two field names collide on
+# any strip; "Sign" next to "Steering" over a two-cell field is the binding case
+F_NAME = ImageFont.truetype(f"{FD}/DejaVuSans-Bold.ttf", 27)
 F_GHOST = ImageFont.truetype(f"{FD}/DejaVuSans-Bold.ttf", 26)
 F_SIZE = ImageFont.truetype(f"{FD}/DejaVuSansMono-Bold.ttf", 40)
 F_RIGHT = ImageFont.truetype(f"{FD}/DejaVuSansMono.ttf", 46)
@@ -49,9 +52,9 @@ F_LEGEND = ImageFont.truetype(f"{FD}/DejaVuSansMono-Bold.ttf", 46)
 F_CAP = ImageFont.truetype(f"{FD}/DejaVuSans-Bold.ttf", 38)
 
 FLOAT32 = [(1, "Sign", SIGN), (8, "Exponent", EXPO), (23, "Significand", SIGD)]
-DEC32 = [(1, "Sign", SIGN), (2, "Comb", COMB), (6, "Exponent", EXPO),
+DEC32 = [(1, "Sign", SIGN), (2, "Steering", STEER), (6, "Exponent", EXPO),
          (23, "Significand", SIGD)]
-DEC32_S11 = [(1, "Sign", SIGN), (2, "Comb", COMB), (8, "Exponent", EXPO),
+DEC32_S11 = [(1, "Sign", SIGN), (2, "Steering", STEER), (8, "Exponent", EXPO),
              (21, "Significand", SIGD)]
 
 
