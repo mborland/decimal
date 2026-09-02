@@ -409,12 +409,6 @@ import boost.decimal; // C++20 module
 - Available individually through vcpkg and conan, or with Boost in most package managers
 - Build with b2 or CMake
 
-^ Fifteen seconds. Nobody came for the build system, but somebody will ask,
-^ so put it on screen once and never mention it again.
-^
-^ The umbrella pulls in everything that has no external dependency. There is
-^ exactly one exception and you will name it in eight minutes.
-
 ---
 
 # Six types
@@ -434,14 +428,6 @@ decimal_fast128_t       32         34      -6143 ..  +6144
 ```
 
 The performance costs exactly double the size.
-
-^ No build. Let them read it — this is the one table in the talk that
-^ rewards silence.
-^
-^ Every number here is numeric_limits, not the docs. Pulled with a program.
-^
-^ "The fast types are not a different numeric model. They are the same
-^ numbers in a roomier box."
 
 ---
 
@@ -463,8 +449,8 @@ class decimal_fast32_t final {
 ```
 
 ^ For decimal32_t every operation starts with decoding the value into
-^ significand, exponent, and sign. With the fast types we skip this
-^ entirely and store the value always normalized.
+significand, exponent, and sign. With the fast types we skip this
+entirely and store the value always normalized.
 
 ---
 
@@ -472,9 +458,9 @@ class decimal_fast32_t final {
 
 **Does the bit pattern matter?**
 
-- **Yes**: a file, a socket, a column, another language, another vendor
+- *Yes*: a file, a socket, a column, another language, another vendor
   → `decimal32_t` `decimal64_t` `decimal128_t`
-- **No**: computed, compared, and discarded
+- *No*: computed, compared, and discarded
   → `decimal_fast32_t` `decimal_fast64_t` `decimal_fast128_t`
 
 ^ Yes is effectively when using it as an interchange format
@@ -516,29 +502,33 @@ decimal64_t{}       + decimal_fast32_t{}   ->  decimal64_t
 decimal_fast128_t{} - decimal128_t{}       ->  decimal_fast128_t
 ```
 
-Wider precision wins. On a tie, **fast wins**.
+Wider precision wins. On a tie, *fast wins*.
 
-^ All four of those are static_asserts in my notes, not claims from the
-^ documentation. Twenty seconds.
-^
+```c++
+decimal32_t{}       + decimal_fast32_t{}   ->  decimal_fast32_t
+```
+
 ^ Mixed comparison works across all six types and against integers, and it
-^ is exact even when the value is not representable in the narrower type —
-^ which is exactly the trap you fall into if you cast by hand first.
+is exact even when the value is not representable in the narrower type —
+which is exactly the trap you fall into if you cast by hand first.
 
 ---
 
 # What it will not do quietly
 
+[.code-highlight: 1]
+[.code-highlight: 2]
+[.code-highlight: 3]
+
 ```c++
-decimal64_t d {3.14};       // explicit only, and discouraged
-int n = d;                  // ill-formed
+decimal64_t d {3.14};        // explicit only, and discouraged
+int n = d;                   // ill-formed and compiler error
+int n = static_cast<int>(d); // OK
 ```
 
-^ This is a seed. You spend that macro on the Boost.Math slide in about
-^ four minutes, and because you planted it here it lands as a consequence
-^ rather than an apology.
-^
-^ Twenty-five seconds.
+^ Conversion from binary float is discouraged due to the representation problem discussed earlier
+
+^ Conversions to and from integers is explicit because they are also not guaranteed to be lossless
 
 ---
 
@@ -552,18 +542,27 @@ int n = d;                  // ill-formed
 4. Performance
 5. When to reach for it
 
-^ "You now know more about the encoding than you will ever need in order to
-^ use it. This part is the part you do need."
-^
-^ Ten seconds. Do not linger on dividers.
+^ Now that we have covered the basics of they types we will cover the library functions that make the useful
 
 ---
 
 [.build-lists: false]
+[.code-highlight: 1]
+[.code-highlight: 2]
+[.code-highlight: 3]
+[.code-highlight: 4]
+[.code-highlight: 5]
+[.code-highlight: 6]
+[.code-highlight: 7]
+[.code-highlight: 8]
+[.code-highlight: 9]
+[.code-highlight: 10]
+[.code-highlight: 11]
+[.code-highlight: all]
 
 # What comes in the box
 
-```
+```text
 <cmath>        over a hundred functions, all constexpr
 <charconv>     to_chars / from_chars, plus two decimal-only formats
 <format>       and {fmt}
@@ -585,21 +584,17 @@ Everything lives in `boost::decimal`, except literals, which live in `boost::dec
 
 ```c++
 template <typename T>
-void sin_identity(T val)
+void work_with_cmath(T val)
 {
     using std::sin;
     using boost::decimal::sin;
 
-    sin(val);           // unqualified. float, double, decimal128_t — all fine.
+    auto result = sin(val); // unqualified. float, double, decimal128_t, etc. work
+	...
 }
 ```
 
-^ example/adl.cpp is the runnable version.
-^
-^ The idiom is the one everybody already knows from swap: pull both
-^ overload sets in with using-declarations, call unqualified, let ADL
-^ pick. Boost.Decimal is not allowed to overload std::sin, so its sin
-^ lives in boost::decimal — same reason, same cure.
+^ If you write generic numeric code you are probably familiar with this idiom already
 
 ---
 
@@ -614,13 +609,12 @@ static_assert(root == "1.414213562373095"_DD, "");
 
 `std::sqrt` is not `constexpr` until C++26.
 
-^ Compiled at -std=c++14 to make sure. Fifteen seconds, then land the last
-^ line and stop talking.
-^
-^ Part 4 is where you explain what this cost — the exception flags. Do not
-^ trail it here, just let them enjoy it.
+^ To the greatest extent possible everything is constexpr.
+All of the <cmath> functions are implemented in native arithmetic whereas the Intel library for example casts to builtin binary floating point, uses the MKL, and then constructs the result
 
 ---
+
+[.build-lists: true]
 
 # Two ways to decompose a value
 
@@ -650,8 +644,16 @@ decimal_fast32_t{3, 2}    decompose  ->  sig 3000000,  exp -4
 # [fit] A deeper look into `<charconv>`
 
 ^ We will not look at our expanded version of <charconv> as being able to process base-10 values is one of the key selling points of the library 
+This is the part that is most used by our known clients
 
 ---
+
+[.code-highlight: 1-2, 3, 9]
+[.code-highlight: 1-2, 4, 9]
+[.code-highlight: 1-2, 5, 9]
+[.code-highlight: 1-2, 6, 9]
+[.code-highlight: 1-2, 7, 9]
+[.code-highlight: 1-2, 8, 9]
 
 # `chars_format` options
 
@@ -661,9 +663,9 @@ enum class chars_format : unsigned
     scientific,
     fixed,
     hex,
+    general = fixed | scientific,
     cohort_preserving_scientific,     // not in <charconv>
     cohort_preserving_fixed,          // not in <charconv>
-    general = fixed | scientific
 };
 ```
 
