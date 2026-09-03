@@ -241,9 +241,11 @@ steer                 layout                              sig. bits
 
 - Non-finite numbers also encode with 11 steering bits
 
-- Example: infinity = 0 | 11 | 1100 + payload
+- Example: infinity = s | 11 | 1100 + payload
 
 ^ Read the slide
+
+^ In the 11 case we have 8 exponent bits and 21 significand bits but we have 3 implied significand bits
 
 ^ The last two 0 bits for the infinity are used to make a quiet nan or a signaling nan
 
@@ -283,8 +285,8 @@ We have a clear 1 in the significand, and then a biased exponent which gives us 
 
 IEEE 754 specifies two encodings:
 
-- **BID**: Binary Integer Significand. Intended for software implementations.
-- **DPD**: Densely Packed Decimal. Intended for hardware implementations.
+**BID**: Binary Integer Significand. Intended for software implementations.
+**DPD**: Densely Packed Decimal. Intended for hardware implementations.
 
 Boost.Decimal uses **BID**, and can convert either way:
 
@@ -464,6 +466,7 @@ entirely and store the value always normalized.
   → `decimal_fast32_t` `decimal_fast64_t` `decimal_fast128_t`
 
 ^ Yes is effectively when using it as an interchange format
+
 ^ No is using it for your own computations
 
 ---
@@ -475,21 +478,19 @@ entirely and store the value always normalized.
 [.code-highlight: 3]
 [.code-highlight: 4]
 [.code-highlight: 5]
+[.code-highlight: 6]
 
 ```c++
-decimal32_t a {1, 1};                                  // 1e1
-decimal32_t b {-2, -1};                                // -0.2
-decimal32_t c {2U, -1, construction_sign::negative};   // -0.2
-decimal32_t d {"4.3e-02"};                             // string or string_view
-auto        e {"3.14159265358979"_DF};                 // literal, rounds to fit
+decimal32_t a {5}				       				   // 5
+decimal32_t b {1, 1};                                  // 1e1
+decimal32_t c {-2, -1};                                // -0.2
+decimal32_t d {2U, -1, construction_sign::negative};   // -0.2
+decimal32_t e {"4.3e-02"};                             // string or string_view
+auto        f {"3.14159265358979"_DF};                 // literal, rounds to fit
 ```
 
-^ Thirty seconds. The design point worth saying out loud: a signed
-^ coefficient or an explicit sign, never both — because what would the
-^ sign of {-3, 0, negative} be? The API refuses to be asked.
-^
 ^ Literals live in namespace boost::decimal::literals, like std::literals.
-^ _DF _DD _DL, and add an f for the fast types.
+_DF _DD _DL, and add an f for the fast types.
 
 ---
 
@@ -503,10 +504,6 @@ decimal_fast128_t{} - decimal128_t{}       ->  decimal_fast128_t
 ```
 
 Wider precision wins. On a tie, *fast wins*.
-
-```c++
-decimal32_t{}       + decimal_fast32_t{}   ->  decimal_fast32_t
-```
 
 ^ Mixed comparison works across all six types and against integers, and it
 is exact even when the value is not representable in the narrower type —
@@ -677,8 +674,6 @@ enum class chars_format : unsigned
 
 # The round trip
 
-[.code-highlight: 1-7]
-[.code-highlight: all]
 
 `<charconv>` using `chars_format::cohort_preserving_scientific`
 
@@ -693,13 +688,13 @@ enum class chars_format : unsigned
 ```
 
 ^ THE payoff slide for the whole cohort thread. Earn it with silence.
-^
+
 ^ STEP 1 — the round trips. "Every one of those is `==` to every other one."
-^
+
 ^ STEP 2 — the format name. "One enumerator. That is the entire feature."
-^
+
 ^ "If you write 3.00 to a ledger, you get 3.00 back out of the ledger. Not
-^ 3, and not 3.000000."
+3, and not 3.000000."
 
 ---
 
@@ -743,24 +738,23 @@ char buf[formatting_limits<decimal64_t>::scientific_format_max_chars];
 ```
 
 ```c++
+#include <boost/decimal/fmt_format.hpp>
 fmt::format("{:*>+12.2e}", val);      // [***+3.14e+00]
+
+#include <boost/decimal/format.hpp>
 std::format("{:*>+12.2e}", val);      // [***+3.14e+00]
 ```
 
 
-^ Thirty seconds.
-^
 ^ Be accurate about what this is: these are adapters, and we wrote them.
-^ format.hpp and fmt_format.hpp are a thousand lines of formatter
-^ specialization between them, plus another hundred and thirty for the
-^ std::hash specializations. The user does not write an adapter. We did.
-^
+format.hpp and fmt_format.hpp are a thousand lines of formatter
+specialization between them, plus another hundred and thirty for the
+std::hash specializations. The user does not write an adapter. We did.
+
 ^ THIS is the one header the umbrella does not pull in: fmt_format.hpp,
-^ because {fmt} is an external and possibly-compiled dependency. Include it
-^ yourself. That is the exception you promised eight minutes ago.
-^
-^ The {fmt} floor is 11, because detection keys on <fmt/base.h>. Verified
-^ against 9.1, 10.2 and 11.1 — the first two are not detected.
+because {fmt} is an external and possibly-compiled dependency. Include it
+yourself. That is the exception you promised eight minutes ago.
+
 
 ---
 
@@ -780,7 +774,7 @@ fmt::format("{:a}", d);     // 3.00e+02
 ```
 
 ^ Alignment, fill, width, sign, precision and the L locale modifier all
-^ behave exactly as they do for built-in floating point. 
+behave exactly as they do for built-in floating point. 
 
 ---
 
@@ -828,7 +822,7 @@ enum class rounding_mode : unsigned
 
 Default is *`fe_dec_to_nearest `*, per IEEE 754 4.3.3 and is called "banker's rounding"
 
-All modes can be set with `boost::decimal::fesetround(rounding_mode mode)`
+All modes can be set with `boost::decimal::fesetround(rounding_mode)`
 
 ^ The one caveat is that your tool chain must support constant evaluation for this to work
 GCC >= 9, Clang >= 12, MSVC >= 1925 or 2019 16.5.1
@@ -893,20 +887,8 @@ static_assert(res == "4.999999e+50"_DF, "Incorrectly rounded result");
 ```
 
 ^ Here we must include the macro before any decimal header to set the compile time rounding mode.
-This rounding mode will carry over to runtime as well and works for every toolchain
-
-^ Three points, one slide. Do all three.
-^
-^ 1. Magnitudes differ by ten orders of magnitude — further apart than the
-^    precision of the type. In a directed mode you still move a full ULP.
-^    Changing the rounding mode changes your answers.
-^
-^ 2. The macro works on every compiler, and being read-only it is thread
-^    safe. There is a runtime fesetround too, which needs consteval
-^    detection and is NOT thread safe. One sentence each.
-^
-^ 3. That is a static_assert on a rounded decimal subtraction. Seed for
-^    Part 4 — we got constexpr, and we paid for it.
+This rounding mode will carry over to runtime as well and works for every toolchain, 
+even those that lack the constant evaluation support 
 
 ---
 
