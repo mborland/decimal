@@ -782,6 +782,8 @@ fmt::format("{:a}", d);     // 3.00e+02
 ^ Alignment, fill, width, sign, precision and the L locale modifier all
 ^ behave exactly as they do for built-in floating point. 
 
+---
+
 # [fit] Rounding
 
 ^ Short divider, or run the next two straight — your call on the clock.
@@ -801,17 +803,35 @@ In `<cfenv>` we have the following four macros useable with `std::fesetround()`:
 
 ---
 
+[.code-highlight: 1-2, 3, 9]
+[.code-highlight: 1-2, 4, 9]
+[.code-highlight: 1-2, 5, 9]
+[.code-highlight: 1-2, 6, 9]
+[.code-highlight: 1-2, 7, 9]
+[.code-highlight: 1-2, 8, 9]
+
 # The Five Decimal Rounding Modes
 
-All modes are in `enum class rounding_mode` and useable with `boost::decimal::fesetround()`:
+Found in `<boost/decimal/cfenv.hpp>`
 
-1. `fe_dec_downward`
-2. `fe_dec_to_nearest` - To nearest, ties to even
-3. `fe_dec_to_nearest_from_zero`
-4. `fe_dec_toward_zero` - The opposite of 3
-5. `fe_dec_upward`
+```c++
+enum class rounding_mode : unsigned
+{
+    fe_dec_downward,				// Toward negative infinity
+    fe_dec_to_nearest, 				// To nearest, ties to even
+    fe_dec_to_nearest_from_zero,	// To nearest, away from zero
+    fe_dec_toward_zero, 			// The opposite of the above
+    fe_dec_upward,					// Toward positive infinity 
+    fe_dec_default = fe_dec_to_nearest
+};
+```
 
-Default is #2, per IEEE 754 4.3.3 and is called "banker's rounding", and is available also as *`fe_dec_default`*
+Default is *`fe_dec_to_nearest `*, per IEEE 754 4.3.3 and is called "banker's rounding"
+
+All modes can be set with `boost::decimal::fesetround(rounding_mode mode)`
+
+^ The one caveat is that your tool chain must support constant evaluation for this to work
+GCC >= 9, Clang >= 12, MSVC >= 1925 or 2019 16.5.1
 
 ---
 
@@ -831,7 +851,7 @@ int main() {
     const decimal32_t rhs {"4e+40"_DF};
     const decimal32_t sum {lhs + rhs};
 
-    std::cout << "5e50 + 4e40 = " << sum << std::end;
+    std::cout << "5e50 + 4e40 = " << sum;
 }
 ```
 Output: `5e50 + 4e40 = 5.000001e+50`
@@ -871,6 +891,9 @@ constexpr decimal32_t res {lhs - rhs};
 
 static_assert(res == "4.999999e+50"_DF, "Incorrectly rounded result");
 ```
+
+^ Here we must include the macro before any decimal header to set the compile time rounding mode.
+This rounding mode will carry over to runtime as well and works for every toolchain
 
 ^ Three points, one slide. Do all three.
 ^
@@ -1005,7 +1028,7 @@ GCC `_DecimalXX` and Intel `BID_UINTXX` are included where available for complet
 
 ![inline](img/perf_x64linux_gcc_64.png)
 
-One honest loss: GCC `_Decimal64` compares faster than we do
+^ One honest loss: GCC `_Decimal64` compares faster than we do
 
 ^ _Decimal64 takes comparisons at 0.56× and effectively ties multiplication at 1.00×; the Boost types hold addition, subtraction, and division. Intel's BID_UINT64 comparisons are the outlier at 5.87× — it sets the shared scale.
 
@@ -1015,7 +1038,7 @@ One honest loss: GCC `_Decimal64` compares faster than we do
 
 ![inline](img/perf_x64linux_gcc_128.png)
 
-The closest race of the three widths
+^ The closest race of the three widths
 
 ^ GCC _Decimal128 genuinely takes multiplication (0.68× of decimal128_t, with decimal_fast128_t at 1.06×). Intel BID_UINT128 beats decimal128_t on addition (0.89×) but not decimal_fast128_t (0.38×). Everything else goes to the Boost types — including the 0.09× comparison number for decimal_fast128_t, consistent with the fast layout skipping the decode step entirely.
 
@@ -1025,7 +1048,10 @@ The closest race of the three widths
 
 ![inline](img/perf_charconv_x64linux.png)
 
-- `<charconv>` is software for every type so the hardware advantage disappears
+^ On the proceeding slides if we had included double it would be one to two orders of magnitude faster than the decimal types depending on width and operation.
+The slowest being 128-bit multiplication as we need to use schoolbook mul out to 256-bits
+
+^ `<charconv>` is software for every type so the hardware advantage disappears
 
 ^ This is also the one case where the fast types are not faster, they have to perform the normalization arithmetic that the regular types do not have to do.
 
@@ -1053,7 +1079,7 @@ At the top of the presentation we suggested:
 
 ---
 
-# Current Clients Applications
+# Current Client Applications
 
 - A trading firm, because their home-brew fixed point could not represent the smallest divisible unit of a Bitcoin (A Satoshi = 1/100,000,000 of a Bitcoin)
 - Several quant firms, who use `<charconv>` extensively
@@ -1065,20 +1091,26 @@ These ones have specifically engaged throughout the development process both pub
 
 ---
 
+[.build-lists: true]
+
 # Takeaways
 
-- Decimal Floating Point types can provide a new way to handle data and computations, but there is a performance cost
-- Boost.Decimal is portable, performant, and available everywhere.
+- If your data is in decimal format your types should be too
+- There is a performance cost with arithmetic, and potential gains with parsing and serialization
+- Additional considerations of rounding, parsing, and serialization modes
+- Boost.Decimal is portable, performant, and available everywhere today
 
 ---
 
-# Questions and Citation
+# Questions
 
+**Docs**: boost.org/doc/libs/latest/libs/decimal/doc/html/overview.html
 
-![inline](img/joss.png)
+**Source**: github.com/boostorg/decimal
 
-https://joss.theoj.org/papers/10.21105/joss.10345 or CITATION.cff in the repo
+**Paper**: joss.theoj.org/papers/10.21105/joss.10345 or CITATION.cff in the source
 
+![right,fit](img/joss.png)
 
 ---
 
