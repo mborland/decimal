@@ -55,7 +55,10 @@ $$
 
 ^ Here are the bits of 0.1f which we will dive into greater detail later
 
+^ The yellow boxes represent 1 bits and the grey boxes represent 0 bits
+
 ^ We see that 0.1 in base 10 is 0.00011 in base two with the last four digits infinitely repeating
+This can also be seen in the significand bits 
 
 ^ Since this never terminates it is actually slightly more than 0.1, but why does it not terminate?
 
@@ -66,7 +69,7 @@ $$
 A fraction terminates in base *b* only if every prime factor of its denominator divides *b*.[^1]
 
 $$
-\frac{1}{10} \qquad 10 = 2 \times 5 \qquad 5 \nmid 2
+0.1 = \frac{1}{10} \qquad 10 = 2 \times 5 \qquad 5 \nmid 2
 $$
 
 No number of bits fixes this. The problem is not precision, but *representability*.
@@ -76,6 +79,9 @@ No number of bits fixes this. The problem is not precision, but *representabilit
 ^ The explanation is actually quite easy, it is that five doe not divide two
 
 ^ As hardy and wright tell us "A fraction terminates in base *b* only if every prime factor of its denominator divides *b*"
+
+^ 0.1 is the same as 1 over 10. The prime factorization of 10 is 2 and 5.
+Obviously 2 divides 2 but 5 does not
 
 ^ This is not a precision problem, this is a representation problem
 
@@ -93,7 +99,9 @@ These numerical types we are about to discuss are useful when these errors are u
 
 ^ Since this is a representation problem the solution is not to simply add more precision such as using 128 bit floats
 
-^ *Read the build slide*
+^ Read the build slide
+
+^ Databases such as SQL have a DECIMAL type for this exact reason.
 
 ---
 
@@ -101,15 +109,17 @@ These numerical types we are about to discuss are useful when these errors are u
 
 # A brief history and availability
 
-- **IEEE 754-2008** specifies decimal floating point with two encodings and three interchange formats
-- **ISO/IEC TR 24733** (2011) sketches a C++ binding. Never adopted into the standard.
+- **IEEE 754-2008** standardizes decimal floating point with two encodings
+- **ISO/IEC TR 24733** (2011) develops a C++ binding. Never adopted into the standard.
 - **N3871** (2014) second attempt at adding decimal types to the C++ standard
 - **C23** adds `_Decimal32` `_Decimal64` `_Decimal128` as an *optional* feature
-- **GCC** libstdc++ ships these types on selected targets (`<decimal/decimal>`), without an accompanying standard library
+- **GCC** libstdc++ ships these types on selected targets (`<decimal/decimal>`), and without an accompanying standard library
 - **IBM's libdfp** fills the library gap
-- **Intel** ships a library with its own types
+- **Intel** ships a C library with its own types and comprehensive standard library, but it only works on Intel architectures
 
 ^ *Read the build slide*
+
+^ Intel's library has been the industry standard
 
 ^ There's an active P-paper for rebasing <cmath> on C23 <math.h>, but it specifically excludes Decimal types. 
 For those interested it is (3935R2 for those interested) 
@@ -118,6 +128,7 @@ For those interested it is (3935R2 for those interested)
 
 # Boost.Decimal
 
+- Authored by Chris Kormanyos and I from 2024 and adopted into Boost in 2026 
 - Header-only, *no dependencies*, C++14
 - Portable: tested on `x86_64`, `x86_32`, ARM64, ARM32, s390x; emulated PPC64LE and Cortex-M
 - Complete Standard Library: `<cmath>`, `<charconv>`, `<format>`, etc.
@@ -131,7 +142,7 @@ For those interested it is (3935R2 for those interested)
 
 [.build-lists: true]
 
-This talk will be divided into five parts
+# This talk will be divided into five parts
 
 1. Inside the bits - how decimal floating point is represented
 2. The types - an overview of the different types provided by the library, and how to use them
@@ -168,7 +179,7 @@ This talk will be divided into five parts
 
 - $$ (-1)^{0} \;\times\; 2^{\,124-127} \;\times\; 1.01_2 \;=\; 1.25 \times 2^{-3} \;=\; 1.25 \div 8 \;=\; 0.15625 $$
 
-- Section 3.4 of IEEE 754-2019
+- $$ 0.15625 = \frac{15625}{100000} = \frac{5}{32} \qquad 32 = 2^5 \qquad 2 | 2 $$
 
 ^ Float value = ...
 
@@ -178,6 +189,8 @@ bias of 127 to get 2 to the minus 3.
 3. Fraction bits 01, with the implied leading 1, read 1.01 in binary give us 1.25. 
 4. 1.25 over 8 is 0.15625.
 5. 0.15625 is exactly representable in binary AND in decimal, which is why it was chosen
+
+^ 0.15625 = 15,625 / 100,000 = 5/32
 
 ---
 
@@ -269,15 +282,22 @@ $$
 
 ---
 
+[.build-lists: true]
+
 # `0.1`, both ways
 
 ![inline](img/pair_0p1.png)
 
-Instead of an infinite repeating sequence, we get an exact value
+- Instead of an infinite repeating sequence, we get an exact value
 
+- Binary (Dyadic) rationals: $$\mathbb{Z}[1/2]$$
+
+- Decimal rationals: $$\mathbb{Z}[1/10] = \mathbb{Z}[1/2, 1/5]$$
 
 ^ Returning to our earlier example of 0.1 we can now see how it is exactly represented in the decimal type.
 We have a clear 1 in the significand, and then a biased exponent which gives us 10^-1 resulting in an exact 0.1
+
+^ Prime factors 2 and 5 means we still cannot exactly represent values such as 1/3 or 1/7, but everything that can be represented exactly in binary can also be exactly represented in decimal
 
 ---
 
@@ -320,10 +340,13 @@ decimal32_t{8388608}  0x6CA00000    0x6A573B08
 ^ Here is our edge case integer where the steering bits change
 
 ^ DPD packs three decimal digits into every ten-bit declet, so 607 and 608
-^ live in the low bits and nothing else moves. BID treats the significand as
-^ one binary integer, so changing the integer changes the encoding.
+live in the low bits and nothing else moves. BID treats the significand as
+one binary integer, so changing the integer changes the encoding.
 
 ^ The benefit to this design is that digit locality is what you want when digits are in silicon
+
+^ This would be more expensive in software since you are having to decode the declets,
+rather than using a simple bit mask to decode the significand
 
 ---
 
@@ -364,6 +387,8 @@ decimal32_t{3000000, -4}   ->   0x30ADC6C0
 
 ^ *READ AND BUILD THE SLIDE*
 
+^ Many ways to represent 300
+
 ---
 
 [.build-lists: true]
@@ -381,6 +406,8 @@ decimal32_t{3000000, -4}   ->   0x30ADC6C0
 ^ Read the slide
 
 ^ Remember from our last slide that -0 and +0 are considered to be in distinct and in different cohorts so this has to be handled as well
+
+^ Junkey Jeon decimal digit counting
 
 ---
 
@@ -496,6 +523,13 @@ _DF _DD _DL, and add an f for the fast types.
 
 # It promotes like you expect
 
+[.code-highlight: 1]
+[.code-highlight: 2]
+[.code-highlight: 3]
+[.code-highlight: 4]
+[.code-highlight: all]
+
+
 ```c++
 decimal32_t{}       + decimal64_t{}        ->  decimal64_t
 decimal64_t{}       * 2                    ->  decimal64_t
@@ -524,6 +558,8 @@ int n = static_cast<int>(d); // OK
 ```
 
 ^ Conversion from binary float is discouraged due to the representation problem discussed earlier
+
+^ Internally we use Ryu by Ulf Adams for this conversion since it decomposes the binary into significand, exponent and sign that we can then construct from
 
 ^ Conversions to and from integers is explicit because they are also not guaranteed to be lossless
 
@@ -612,6 +648,10 @@ All of the <cmath> functions are implemented in native arithmetic whereas the In
 ---
 
 [.build-lists: true]
+[.code-highlight: 1-2]
+[.code-highlight: 4-5]
+[.code-highlight: 7-8]
+[.code-highlight: all]
 
 # Two ways to decompose a value
 
@@ -814,7 +854,7 @@ enum class rounding_mode : unsigned
     fe_dec_downward,				// Toward negative infinity
     fe_dec_to_nearest, 				// To nearest, ties to even
     fe_dec_to_nearest_from_zero,	// To nearest, away from zero
-    fe_dec_toward_zero, 			// The opposite of the above
+    fe_dec_toward_zero, 			// Always towards zero
     fe_dec_upward,					// Toward positive infinity 
     fe_dec_default = fe_dec_to_nearest
 };
@@ -939,6 +979,8 @@ __global__ void add(const decimal64_t* a, const decimal64_t* b,
 
 Device results compare to the same loop run on the host
 
+^ Best practice would be to define BOOST_DECIMAL_ENABLE_CUDA within CMake
+
 ---
 
 # Debugging Pretty Printers
@@ -962,6 +1004,8 @@ Device results compare to the same loop run on the host
 5. When to reach for it
 
 ---
+
+[.build-lists: false]
 
 # Benchmarks
 
@@ -1040,6 +1084,8 @@ The slowest being 128-bit multiplication as we need to use schoolbook mul out to
 ^ Boost.Charconv is about 15,000 lines for the full implementation whereas this is under 2,000 in decimal
 
 ---
+
+[.build-lists: false]
 
 # Part 5 of 5
 
